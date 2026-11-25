@@ -108,7 +108,7 @@ export async function searchStations(
 ): Promise<Station[]> {
   const params = new URLSearchParams({
     hidebroken: "true",
-    order: query.order === "votes" ? "votes" : "clickcount",
+    order: query.order ?? "clickcount",
     reverse: "true",
     limit: String(Math.min(Math.max(query.limit ?? 50, 1), 100)),
     offset: String(Math.max(query.offset ?? 0, 0)),

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import type { FilterOption } from "@/types/station";
 
 interface DropdownProps {
@@ -17,6 +17,7 @@ function Dropdown({ icon, placeholder, options, value, onChange }: DropdownProps
   const [activeIndex, setActiveIndex] = useState(-1);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
+  const listboxId = useId();
 
   const selected = options.find((o) => o.value === value) ?? null;
 
@@ -27,6 +28,15 @@ function Dropdown({ icon, placeholder, options, value, onChange }: DropdownProps
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
+
+  // 键盘移动活动项时，保证它在可视区内（长列表按 ↓ 不会「按了看不见」）
+  useEffect(() => {
+    if (!open || activeIndex < 0 || !listRef.current) return;
+    const el = listRef.current.children[activeIndex];
+    if (el instanceof HTMLElement) {
+      el.scrollIntoView({ block: "nearest" });
+    }
+  }, [activeIndex, open]);
 
   useEffect(() => {
     if (!open) return;
@@ -119,8 +129,10 @@ function Dropdown({ icon, placeholder, options, value, onChange }: DropdownProps
       {open && (
         <ul
           ref={listRef}
+          id={listboxId}
           role="listbox"
           aria-label={placeholder}
+          aria-activedescendant={activeIndex >= 0 ? `${listboxId}-opt-${activeIndex}` : undefined}
           tabIndex={-1}
           onKeyDown={onKeyDown}
           className="absolute left-0 top-[calc(100%+6px)] z-30 max-h-72 w-56 overflow-y-auto rounded-xl border border-border bg-surface p-1.5 shadow-xl shadow-black/20 outline-none"
@@ -128,7 +140,7 @@ function Dropdown({ icon, placeholder, options, value, onChange }: DropdownProps
           {options.map((opt, i) => {
             const isSelected = opt.value === value;
             return (
-              <li key={opt.value} role="option" aria-selected={isSelected}>
+              <li key={opt.value} id={`${listboxId}-opt-${i}`} role="option" aria-selected={isSelected}>
                 <button
                   type="button"
                   onClick={() => select(isSelected ? null : opt.value)}
@@ -160,6 +172,8 @@ interface FilterBarProps {
   country: string | null;
   language: string | null;
   tag: string | null;
+  order: string;
+  onOrderChange: (value: string) => void;
   onCountryChange: (v: string | null) => void;
   onLanguageChange: (v: string | null) => void;
   onTagChange: (v: string | null) => void;
@@ -167,10 +181,15 @@ interface FilterBarProps {
   hasActiveFilters: boolean;
 }
 
+const ORDER_OPTIONS: FilterOption[] = [
+  { value: "clickcount", label: "收听量优先" },
+  { value: "votes", label: "投票数优先" },
+];
+
 export function FilterBar(props: FilterBarProps) {
   const {
     query, onQueryChange, countries, languages, tags,
-    country, language, tag,
+    country, language, tag, order, onOrderChange,
     onCountryChange, onLanguageChange, onTagChange,
     onClearAll, hasActiveFilters,
   } = props;
@@ -208,6 +227,13 @@ export function FilterBar(props: FilterBarProps) {
         <Dropdown icon="🌍" placeholder="国家" options={countries} value={country} onChange={onCountryChange} />
         <Dropdown icon="🗣️" placeholder="语言" options={languages} value={language} onChange={onLanguageChange} />
         <Dropdown icon="🎵" placeholder="类型" options={tags} value={tag} onChange={onTagChange} />
+        <Dropdown
+          icon="🔀"
+          placeholder="排序"
+          options={ORDER_OPTIONS}
+          value={order}
+          onChange={(v) => onOrderChange(v ?? "clickcount")}
+        />
         {hasActiveFilters && (
           <button
             type="button"

@@ -135,6 +135,16 @@ body {
   outline-offset: 2px;
 }
 
+/* 交互元素显式 pointer 光标（Tailwind v4 preflight 不再默认提供）；
+   放在 base 层，避免覆盖旋钮的 cursor-grab 等工具类 */
+@layer base {
+  button:not(:disabled),
+  a,
+  [role="tab"] {
+    cursor: pointer;
+  }
+}
+
 /* 移动端安全区辅助类 */
 .safe-bottom {
   padding-bottom: max(0px, env(safe-area-inset-bottom));
@@ -255,16 +265,6 @@ body {
   }
 }
 
-.radio-playing .knob-vol {
-  animation: knob-spin 6s linear infinite;
-}
-
-@keyframes knob-spin {
-  to {
-    rotate: 360deg;
-  }
-}
-
 .led {
   background: color-mix(in srgb, var(--color-danger) 25%, transparent);
   transition: background-color 0.3s, box-shadow 0.3s;
@@ -273,6 +273,23 @@ body {
 .radio-playing .led {
   background: var(--color-danger);
   box-shadow: 0 0 10px var(--color-danger);
+}
+
+/* 收藏红心跳动（fav-pop 由收藏状态变化触发） */
+@keyframes fav-pop {
+  0% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(1.4);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.fav-pop svg {
+  animation: fav-pop 0.4s ease-out;
 }
 
 /* 动效降级：用户偏好减少动效时全部禁用 */

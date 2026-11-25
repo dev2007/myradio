@@ -297,8 +297,10 @@ export function RetroRadio({
                   {marquee ? (
                     <>
                       {name}
-                      {"\u00A0\u00A0\u00A0\u00A0"}
-                      {name}
+                      <span aria-hidden="true">
+                        {"\u00A0\u00A0\u00A0\u00A0"}
+                        {name}
+                      </span>
                     </>
                   ) : (
                     name
@@ -345,8 +347,9 @@ export function RetroRadio({
                   <path d="M15.5 8.5a5 5 0 0 1 0 7" />
                   <path d="M19 5a9 9 0 0 1 0 14" />
                 </svg>
+                <span className="sr-only">音量 {volPercent}%</span>
                 <span
-                  aria-label={`音量 ${volPercent}`}
+                  aria-hidden="true"
                   className="font-mono text-[10px] font-bold text-[var(--color-accent)]"
                 >
                   {volPercent}
@@ -404,7 +407,7 @@ export function RetroRadio({
                       : `收藏 ${station.name}`
                     : "暂无播放中的电台"
                 }
-                className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md shadow-inner transition-[background-color,box-shadow] duration-150 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent ${
+                className={`relative flex h-7 w-7 shrink-0 items-center justify-center rounded-md shadow-inner transition-[background-color,box-shadow] duration-150 after:absolute after:-inset-2 after:rounded-md after:content-[''] focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent ${
                   favActive
                     ? "bg-black/45 text-danger shadow-[0_0_10px_rgba(248,113,113,0.55)]"
                     : "bg-black/30 text-white/60 hover:bg-black/40 hover:text-white/85"
@@ -431,7 +434,7 @@ export function RetroRadio({
                   onClick={() => onListTabChange(t)}
                   aria-pressed={listTab === t}
                   aria-label={t === "favorites" ? "切换到我的收藏列表" : "切换到历史播放列表"}
-                  className={`flex h-7 flex-1 items-center justify-center rounded-md text-[10px] font-bold shadow-inner transition-[background-color,box-shadow] duration-150 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent ${
+                  className={`relative flex h-7 flex-1 items-center justify-center rounded-md text-[10px] font-bold shadow-inner transition-[background-color,box-shadow] duration-150 after:absolute after:inset-x-0 after:-inset-y-2 after:rounded-md after:content-[''] focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent ${
                     listTab === t
                       ? "bg-gradient-to-b from-[#e8e6e1] to-[#a8a49c] text-[var(--radio-body-2)] shadow-[0_0_12px_rgba(255,255,255,0.55)]"
                       : "bg-black/30 text-white/60 hover:bg-black/40 hover:text-white/80"
@@ -453,6 +456,7 @@ export function RetroRadio({
           aria-valuemin={0}
           aria-valuemax={100}
           aria-valuenow={volPercent}
+          aria-valuetext={`${volPercent}%`}
           onPointerDown={onKnobPointerDown}
           onPointerMove={onKnobPointerMove}
           onPointerUp={() => {

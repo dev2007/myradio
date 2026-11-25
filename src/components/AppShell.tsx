@@ -62,8 +62,8 @@ export function AppShell({ initialItems, initialError }: AppShellProps) {
         aria-selected={page === 0}
         aria-label="收音机页"
         onClick={() => goToPage(0)}
-        className={`h-8 min-w-[44px] rounded-full px-3 text-xs font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent ${
-          page === 0 ? "bg-primary text-white" : "text-text-muted hover:text-text"
+        className={`relative h-8 min-w-[44px] rounded-full px-3 text-xs font-semibold transition-colors after:absolute after:inset-x-0 after:-inset-y-1.5 after:rounded-full after:content-[''] focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent ${
+          page === 0 ? "bg-surface-2 text-text" : "text-text-muted hover:text-text"
         }`}
       >
         收音机
@@ -74,27 +74,11 @@ export function AppShell({ initialItems, initialError }: AppShellProps) {
         aria-selected={page === 1}
         aria-label="频道浏览页"
         onClick={() => goToPage(1)}
-        className={`h-8 min-w-[44px] rounded-full px-3 text-xs font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent ${
-          page === 1 ? "bg-primary text-white" : "text-text-muted hover:text-text"
+        className={`relative h-8 min-w-[44px] rounded-full px-3 text-xs font-semibold transition-colors after:absolute after:inset-x-0 after:-inset-y-1.5 after:rounded-full after:content-[''] focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent ${
+          page === 1 ? "bg-surface-2 text-text" : "text-text-muted hover:text-text"
         }`}
       >
         频道
-      </button>
-    </div>
-  );
-
-  const backRow = (
-    <div className="mb-4">
-      <button
-        type="button"
-        onClick={() => goToPage(0)}
-        aria-label="返回收音机页"
-        className="flex min-h-[44px] items-center gap-1.5 rounded-full px-3 text-sm font-medium text-text-muted transition-colors hover:bg-surface-2 hover:text-text focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
-      >
-        <svg aria-hidden="true" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M10 3.5L5.5 8L10 12.5" />
-        </svg>
-        返回收音机
       </button>
     </div>
   );
@@ -142,6 +126,7 @@ export function AppShell({ initialItems, initialError }: AppShellProps) {
           <section
             aria-label="收音机"
             aria-hidden={page !== 0}
+            inert={page !== 0}
             className="h-full w-1/2 overflow-hidden"
           >
             <RadioHome onBrowse={() => goToPage(1)} />
@@ -150,10 +135,10 @@ export function AppShell({ initialItems, initialError }: AppShellProps) {
           <section
             aria-label="全部电台"
             aria-hidden={page !== 1}
+            inert={page !== 1}
             className="no-scrollbar h-full w-1/2 overflow-y-auto px-4 pb-8 pt-4 sm:px-6"
           >
             <div className="mx-auto w-full max-w-6xl">
-              {backRow}
               <HomeBrowser initialItems={initialItems} initialError={initialError} />
               {dataSource}
             </div>

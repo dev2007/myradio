@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Station } from "@/types/station";
 import { usePlayer } from "@/lib/player-context";
 import { useFavorites } from "@/lib/favorites-context";
@@ -40,6 +40,19 @@ export function StationCard({ station }: { station: Station }) {
   const isPlaying = isCurrent && state === "playing";
   const isLoading = isCurrent && state === "loading";
   const fav = isFavorite(station.uuid);
+  const [favPop, setFavPop] = useState(false);
+  const prevFav = useRef(fav);
+
+  // 仅在「未收藏 → 已收藏」变化时播放一次弹跳，页面初始加载不触发
+  useEffect(() => {
+    const wasFav = prevFav.current;
+    prevFav.current = fav;
+    if (fav && !wasFav) {
+      setFavPop(true);
+      const timer = setTimeout(() => setFavPop(false), 400);
+      return () => clearTimeout(timer);
+    }
+  }, [fav]);
 
   return (
     <div
@@ -113,7 +126,7 @@ export function StationCard({ station }: { station: Station }) {
       )}
 
       <div className="flex items-center justify-between text-[11px] text-text-muted">
-        <span>▲ {formatCount(station.clickcount)} 收听</span>
+        <span>{formatCount(station.clickcount)} 次收听</span>
         <span
           className={`rounded-full px-2 py-0.5 font-medium transition-colors ${
             isPlaying
@@ -133,7 +146,7 @@ export function StationCard({ station }: { station: Station }) {
         aria-label={fav ? `取消收藏 ${station.name}` : `收藏 ${station.name}`}
         className={`absolute right-1.5 top-1.5 z-20 flex h-11 w-11 items-center justify-center rounded-full transition-colors ${
           fav ? "text-danger" : "text-text-muted hover:text-danger"
-        }`}
+        } ${favPop ? "fav-pop" : ""}`}
       >
         <svg
           aria-hidden="true"

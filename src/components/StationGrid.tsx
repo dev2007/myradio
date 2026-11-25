@@ -26,9 +26,18 @@ interface StationGridProps {
   loading: boolean;
   error: string | null;
   onRetry: () => void;
+  hasActiveFilters?: boolean;
+  onClearFilters?: () => void;
 }
 
-export function StationGrid({ items, loading, error, onRetry }: StationGridProps) {
+export function StationGrid({
+  items,
+  loading,
+  error,
+  onRetry,
+  hasActiveFilters,
+  onClearFilters,
+}: StationGridProps) {
   if (loading && items.length === 0) {
     return (
       <div
@@ -47,7 +56,9 @@ export function StationGrid({ items, loading, error, onRetry }: StationGridProps
     return (
       <div className="flex flex-col items-center gap-4 rounded-2xl border border-border bg-surface px-6 py-12 text-center">
         <span className="text-3xl" aria-hidden="true">📶</span>
-        <p className="text-sm text-text-muted">{error}</p>
+        <p role="alert" className="text-sm text-text-muted">
+          {error}
+        </p>
         <button
           type="button"
           onClick={onRetry}
@@ -63,7 +74,16 @@ export function StationGrid({ items, loading, error, onRetry }: StationGridProps
     return (
       <div className="flex flex-col items-center gap-3 rounded-2xl border border-border bg-surface px-6 py-12 text-center">
         <span className="text-3xl" aria-hidden="true">🔍</span>
-        <p className="text-sm text-text-muted">没有找到匹配的电台，换个关键词试试</p>
+        <p className="text-sm text-text-muted">没有找到匹配的电台，换个关键词或减少筛选试试</p>
+        {hasActiveFilters && onClearFilters && (
+          <button
+            type="button"
+            onClick={onClearFilters}
+            className="mt-1 min-h-[44px] rounded-full border border-border bg-surface px-5 text-sm font-medium text-primary-light transition-colors hover:border-primary/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+          >
+            清除筛选
+          </button>
+        )}
       </div>
     );
   }

@@ -16,11 +16,11 @@ export interface Station {
   hls: boolean;
 }
 
-/** 筛选器选项（国家/语言/类型通用） */
+/** 筛选器选项（国家/语言/类型/排序通用） */
 export interface FilterOption {
   value: string;
   label: string;
-  count: number;
+  count?: number;
 }
 
 /** 电台列表接口返回 */
@@ -33,7 +33,7 @@ export interface FiltersResponse {
   items: FilterOption[];
 }
 
-export type StationOrder = "clickcount" | "votes";
+export type StationOrder = "clickcount" | "votes" | "random";
 
 /** /api/stations 的查询参数 */
 export interface StationQuery {

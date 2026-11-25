@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import type { Station } from "@/types/station";
 import { usePlayer } from "@/lib/player-context";
 import { useFavorites, useHistory } from "@/lib/favorites-context";
@@ -77,6 +77,26 @@ export function RadioHome({ onBrowse }: RadioHomeProps) {
   const { favorites, removeFavorite } = useFavorites();
   const { history } = useHistory();
   const [listTab, setListTab] = useState<"favorites" | "history">("favorites");
+  const [randomLoading, setRandomLoading] = useState(false);
+  const [randomError, setRandomError] = useState<string | null>(null);
+
+  /** 随便听听：从全库随机挑一个电台直接播放（order=random 取若干个，取首个可播的） */
+  const playRandom = useCallback(async () => {
+    if (randomLoading) return;
+    setRandomLoading(true);
+    setRandomError(null);
+    try {
+      const res = await fetch("/api/stations?order=random&limit=10");
+      if (!res.ok) throw new Error();
+      const data = (await res.json()) as { items: Station[] };
+      if (data.items.length === 0) throw new Error();
+      playStation(data.items[0]);
+    } catch {
+      setRandomError("没挑到电台，再试一次吧");
+    } finally {
+      setRandomLoading(false);
+    }
+  }, [playStation, randomLoading]);
 
   const isLoading = state === "loading";
   const isPlaying = state === "playing";
@@ -122,16 +142,33 @@ export function RadioHome({ onBrowse }: RadioHomeProps) {
           </p>
         )}
         {!current && (
-          <button
-            type="button"
-            onClick={onBrowse}
-            className="mt-1 flex min-h-[44px] items-center justify-center gap-2 rounded-full border border-primary/40 bg-surface px-6 text-sm font-semibold text-primary-light transition-colors hover:bg-surface-2 hover:text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
-          >
-            <span aria-hidden="true">📡</span> 选择一个电台开始收听
-            <svg aria-hidden="true" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M6 3.5L10.5 8L6 12.5" />
-            </svg>
-          </button>
+          <div className="mt-1 flex w-full flex-col items-center gap-1.5">
+            <button
+              type="button"
+              onClick={onBrowse}
+              className="flex min-h-[44px] w-full max-w-xs items-center justify-center gap-2 rounded-full border border-primary/40 bg-surface px-6 text-sm font-semibold text-primary-light transition-colors hover:bg-surface-2 hover:text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+            >
+              <span aria-hidden="true">📡</span> 选择一个电台开始收听
+              <svg aria-hidden="true" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M6 3.5L10.5 8L6 12.5" />
+              </svg>
+            </button>
+            <button
+              type="button"
+              onClick={() => void playRandom()}
+              disabled={randomLoading}
+              aria-busy={randomLoading}
+              className="flex min-h-[44px] items-center justify-center gap-1.5 rounded-full px-4 text-sm font-medium text-text-muted transition-colors hover:text-text focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-50"
+            >
+              <span aria-hidden="true">🎲</span>
+              {randomLoading ? "正在挑一个…" : "或者，随便听听"}
+            </button>
+            {randomError && (
+              <p role="alert" className="text-xs text-danger">
+                {randomError}
+              </p>
+            )}
+          </div>
         )}
       </div>
 
@@ -151,7 +188,7 @@ export function RadioHome({ onBrowse }: RadioHomeProps) {
             onClick={() => setListTab("favorites")}
             className={`flex min-h-[36px] min-w-[44px] flex-1 items-center justify-center rounded-full px-3 text-sm font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent ${
               listTab === "favorites"
-                ? "bg-primary text-white"
+                ? "bg-surface-2 text-text shadow-sm"
                 : "text-text-muted hover:text-text"
             }`}
           >
@@ -164,7 +201,7 @@ export function RadioHome({ onBrowse }: RadioHomeProps) {
             onClick={() => setListTab("history")}
             className={`flex min-h-[36px] min-w-[44px] flex-1 items-center justify-center rounded-full px-3 text-sm font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent ${
               listTab === "history"
-                ? "bg-primary text-white"
+                ? "bg-surface-2 text-text shadow-sm"
                 : "text-text-muted hover:text-text"
             }`}
           >
