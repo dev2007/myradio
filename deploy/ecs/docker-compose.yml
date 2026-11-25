@@ -1,0 +1,38 @@
+# ECS 端运行 ACR 镜像
+# 仅对内暴露 3000，由同网络的「反向代理（nginx/Caddy）」负责 TLS 与路由；
+# 反向代理用 http://radio:3000 访问本服务（见下方 networks.aliases）。
+#
+# 用法：
+#   1. 在 compose 同目录准备 .env（或导出环境变量），至少包含：
+#      ACR_REGISTRY        如 registry.cn-hangzhou.aliyuncs.com
+#      ACR_NAMESPACE       你的 ACR 命名空间
+#      ACR_REPOSITORY      你的 ACR 仓库名（如 myradio）
+#   2. 外部网络 myblog_default 需已存在（由你的反代 compose 项目创建）；
+#      若单独运行本文件，先执行： docker network create myblog_default
+#   3. 拉取并启动： ./start.sh  或  docker compose pull && docker compose up -d
+#   4. 反代 upstream 指向 http://radio:3000 （别名 radio）
+#
+# 鉴权：推荐给 ECS 实例绑定「具有 ACR 拉取权限的 RAM 角色」实现免密拉取；
+#       否则先在 ECS 上执行一次 docker login 到 ACR（或用 start.sh 自动登录）。
+services:
+  radio:
+    image: ${ACR_REGISTRY}/${ACR_NAMESPACE}/${ACR_REPOSITORY}:latest
+    restart: unless-stopped
+    expose:
+      - "3000"
+    environment:
+      NODE_ENV: production
+    networks:
+      myblog:
+        aliases:
+          - radio
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+networks:
+  myblog:
+    external: true
+    name: myblog_default
