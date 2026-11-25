@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { Station } from "@/types/station";
 import { usePlayer } from "@/lib/player-context";
 import { useFavorites } from "@/lib/favorites-context";
@@ -53,6 +53,24 @@ export function StationCard({ station }: { station: Station }) {
       return () => clearTimeout(timer);
     }
   }, [fav]);
+
+  const [shareCopied, setShareCopied] = useState(false);
+
+  /** 分享电台：优先系统分享面板，否则复制 ?station=uuid 链接（打开链接会自动播放） */
+  const shareStation = useCallback(async () => {
+    const url = `${window.location.origin}/?station=${station.uuid}`;
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: station.name, url });
+        return;
+      }
+      await navigator.clipboard.writeText(url);
+      setShareCopied(true);
+      setTimeout(() => setShareCopied(false), 2000);
+    } catch {
+      // 用户取消分享面板或剪贴板不可用：静默处理
+    }
+  }, [station.uuid, station.name]);
 
   return (
     <div
@@ -126,7 +144,28 @@ export function StationCard({ station }: { station: Station }) {
       )}
 
       <div className="flex items-center justify-between text-[11px] text-text-muted">
-        <span>{formatCount(station.clickcount)} 次收听</span>
+        <span className="flex items-center">
+          <button
+            type="button"
+            onClick={() => void shareStation()}
+            aria-label={shareCopied ? "链接已复制" : `分享 ${station.name}`}
+            title={shareCopied ? "链接已复制" : "分享电台"}
+            className="relative -ml-1 flex h-8 w-8 items-center justify-center rounded-full text-text-muted transition-colors hover:text-text after:absolute after:-inset-2 after:rounded-full after:content-[''] focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+          >
+            {shareCopied ? (
+              <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-success">
+                <path d="M20 6L9 17l-5-5" />
+              </svg>
+            ) : (
+              <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 15V4" />
+                <path d="M8 7.5L12 3.5l4 4" />
+                <path d="M5.5 11.5V19h13v-7.5" />
+              </svg>
+            )}
+          </button>
+          <span>{formatCount(station.clickcount)} 次收听</span>
+        </span>
         <span
           className={`rounded-full px-2 py-0.5 font-medium transition-colors ${
             isPlaying

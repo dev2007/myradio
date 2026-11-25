@@ -127,6 +127,17 @@ export async function searchStations(
   return raw.map(toStation).filter((s) => Boolean(s.streamUrl));
 }
 
+/** 按 uuid 获取单个电台（分享链接 ?station=uuid 打开时用） */
+export async function getStationByUuid(uuid: string): Promise<Station | null> {
+  const raw = await requestUpstream<RawStation[]>(
+    `/json/stations/byuuid/${encodeURIComponent(uuid)}`,
+    new URLSearchParams(),
+    UPSTREAM_TIMEOUT_MS
+  );
+  const list = raw.map(toStation).filter((s) => Boolean(s.streamUrl));
+  return list[0] ?? null;
+}
+
 type FilterKind = "countries" | "languages" | "tags";
 
 interface RawFilterItem {

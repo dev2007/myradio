@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Station } from "@/types/station";
+import { usePlayer } from "@/lib/player-context";
 import { RadioHome } from "./RadioHome";
 import { HomeBrowser } from "./HomeBrowser";
 import { ThemeToggle } from "./ThemeToggle";
@@ -16,12 +17,42 @@ interface AppShellProps {
 export function AppShell({ initialItems, initialError }: AppShellProps) {
   const [page, setPage] = useState(0);
   const touchStart = useRef<{ x: number; y: number } | null>(null);
+  const { current, playStation } = usePlayer();
 
   useEffect(() => {
     const onPlay = () => setPage(0);
     window.addEventListener("radioo:play", onPlay);
     return () => window.removeEventListener("radioo:play", onPlay);
   }, []);
+
+  // 分享链接 ?station=uuid 打开时自动播放该电台；
+  // 成功后清除 URL 参数，避免刷新时意外重新自动播放
+  const autoPlayRef = useRef(false);
+  const currentRef = useRef<Station | null>(null);
+  useEffect(() => {
+    currentRef.current = current;
+  }, [current]);
+
+  useEffect(() => {
+    if (autoPlayRef.current) return;
+    const uuid = new URLSearchParams(window.location.search).get("station");
+    if (!uuid) return;
+    autoPlayRef.current = true;
+    window.history.replaceState(null, "", window.location.pathname);
+    (async () => {
+      try {
+        const res = await fetch(`/api/stations?uuid=${encodeURIComponent(uuid)}`);
+        if (!res.ok) return;
+        const data = (await res.json()) as { items: Station[] };
+        // 拉取期间用户手动开播则让位
+        if (!currentRef.current && data.items[0]) {
+          playStation(data.items[0]);
+        }
+      } catch {
+        // 静默失败：用户可手动选择电台
+      }
+    })();
+  }, [playStation]);
 
   const goToPage = useCallback((next: number) => {
     setPage(Math.min(Math.max(next, 0), 1));

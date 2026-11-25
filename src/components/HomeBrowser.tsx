@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { FilterOption, Station } from "@/types/station";
+import { useFavorites } from "@/lib/favorites-context";
 import { FilterBar } from "./FilterBar";
 import { StationGrid } from "./StationGrid";
 
@@ -26,12 +27,14 @@ interface HomeBrowserProps {
 }
 
 export function HomeBrowser({ initialItems, initialError }: HomeBrowserProps) {
+  const { isFavorite, favorites } = useFavorites();
   const [query, setQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [country, setCountry] = useState<string | null>(null);
   const [language, setLanguage] = useState<string | null>(null);
   const [tag, setTag] = useState<string | null>(null);
   const [order, setOrder] = useState<SortOrder>("clickcount");
+  const [favOnly, setFavOnly] = useState(false);
   const [items, setItems] = useState<Station[]>(initialItems);
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -110,12 +113,21 @@ export function HomeBrowser({ initialItems, initialError }: HomeBrowserProps) {
 
   const hasActiveFilters = Boolean(debouncedQuery || country || language || tag);
 
+  // 「只看收藏」为纯客户端过滤，叠加在接口结果之上
+  const displayItems = useMemo(
+    () => (favOnly ? items.filter((s) => isFavorite(s.uuid)) : items),
+    [items, favOnly, isFavorite]
+  );
+
+  const hasAnyFilter = hasActiveFilters || favOnly;
+
   const clearAll = useMemo(
     () => () => {
       setQuery("");
       setCountry(null);
       setLanguage(null);
       setTag(null);
+      setFavOnly(false);
     },
     []
   );
@@ -144,17 +156,46 @@ export function HomeBrowser({ initialItems, initialError }: HomeBrowserProps) {
           正在加载…
         </p>
       )}
-      {items.length > 0 && (
-        <p className="text-xs text-text-muted">
-          按{order === "votes" ? "投票数" : "收听量"}排序 · 已加载 {items.length} 个电台
-        </p>
-      )}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        {displayItems.length > 0 && (
+          <p className="text-xs text-text-muted">
+            按{order === "votes" ? "投票数" : "收听量"}排序 · 已加载 {displayItems.length} 个电台
+          </p>
+        )}
+        {favorites.length > 0 && (
+          <button
+            type="button"
+            onClick={() => setFavOnly((v) => !v)}
+            aria-pressed={favOnly}
+            className={`flex min-h-[44px] items-center gap-1.5 rounded-full border px-4 text-xs font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent ${
+              favOnly
+                ? "border-primary/60 bg-primary/15 text-primary-light"
+                : "border-border bg-surface text-text-muted hover:border-primary/40 hover:text-text"
+            }`}
+          >
+            <svg
+              aria-hidden="true"
+              width="13"
+              height="13"
+              viewBox="0 0 24 24"
+              fill={favOnly ? "currentColor" : "none"}
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7z" />
+            </svg>
+            只看收藏
+          </button>
+        )}
+      </div>
       <StationGrid
-        items={items}
+        items={displayItems}
         loading={loading}
         error={error}
         onRetry={() => void load()}
-        hasActiveFilters={hasActiveFilters}
+        hasActiveFilters={hasAnyFilter}
         onClearFilters={clearAll}
       />
       {!loading && !error && items.length > 0 && (

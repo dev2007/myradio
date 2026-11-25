@@ -223,17 +223,6 @@ body {
   }
 }
 
-/* 液晶屏频道名跑马灯（名称过长时滚动） */
-.lcd-marquee {
-  animation: lcd-slide 9s linear infinite;
-}
-
-@keyframes lcd-slide {
-  to {
-    transform: translateX(-50%);
-  }
-}
-
 .machine-eq span {
   width: 5px;
   height: 20%;

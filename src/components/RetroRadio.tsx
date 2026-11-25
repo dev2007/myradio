@@ -13,9 +13,6 @@ function fauxFrequency(name: string): number {
   return 88 + (h % 200) / 10;
 }
 
-const FREQ_MIN = 88;
-const FREQ_MAX = 108;
-
 interface RetroRadioProps {
   station: Station | null;
   isPlaying: boolean;
@@ -25,6 +22,8 @@ interface RetroRadioProps {
   onListTabChange: (tab: "favorites" | "history") => void;
   channels: Station[];
   onChannelSelect: (station: Station) => void;
+  onRandom: () => void;
+  randomLoading: boolean;
 }
 
 const BANDS = ["FM", "AM", "SW"] as const;
@@ -35,6 +34,15 @@ const DEG_PER_PERCENT = 3;
 /** 调台旋钮：每转动 30° 才切换一个频道（大阻尼，一格一格精准切换，一圈最多 12 个台） */
 const CHANNEL_STEP_DEG = 30;
 
+/** 液晶屏频道列表视窗：行高 18px，可视约 6 行，选中项保持在视窗内 */
+const LCD_ROW_H = 18;
+const LCD_VISIBLE = 6;
+
+const FREQ_MIN = 88;
+const FREQ_MAX = 108;
+/** 刻度线：每 2MHz 一条，共 11 条 */
+const FREQ_TICKS = Array.from({ length: 11 }, (_, i) => FREQ_MIN + i * 2);
+
 export function RetroRadio({
   station,
   isPlaying,
@@ -44,6 +52,8 @@ export function RetroRadio({
   onListTabChange,
   channels,
   onChannelSelect,
+  onRandom,
+  randomLoading,
 }: RetroRadioProps) {
   const { volume, setVolume } = usePlayer();
   const { isFavorite, toggleFavorite } = useFavorites();
@@ -206,14 +216,14 @@ export function RetroRadio({
   const knobRotation = volPercent * DEG_PER_PERCENT;
   const channelIndex = channels.findIndex((s) => s.uuid === station?.uuid);
   const freq = station ? fauxFrequency(station.name) : 98.5;
-  const needleLeft = ((freq - FREQ_MIN) / (FREQ_MAX - FREQ_MIN)) * 100;
-  const name = station ? station.name : "RADIO";
-  const marquee = name.length > 14;
-  const ticks = Array.from({ length: 11 }, (_, i) => FREQ_MIN + i * 2);
+  // 列表滚动偏移：选中项尽量保持在视窗中部，越界钳制
+  const listOffset =
+    Math.min(Math.max(channelIndex - 2, 0), Math.max(channels.length - LCD_VISIBLE, 0)) *
+    LCD_ROW_H;
 
   return (
     <div
-      className={`radio-machine relative mx-auto w-full max-w-lg ${isPlaying ? "radio-playing" : ""}`}
+      className={`radio-machine relative mx-auto w-full max-w-[min(100%,calc((100dvh_-_240px)*1.7778))] ${isPlaying ? "radio-playing" : ""}`}
     >
       {/* 天线（右上，播放时摆动） */}
       <div
@@ -276,8 +286,8 @@ export function RetroRadio({
 
           {/* 右：液晶屏 + 控制排 */}
           <div className="flex min-w-0 flex-1 flex-col gap-2">
-            <div className="relative flex-1 overflow-hidden rounded-lg bg-[var(--radio-screen)] px-2.5 py-2">
-              {/* 频段头（随选中点亮）+ 频率读数 */}
+            <div className="relative flex flex-1 flex-col overflow-hidden rounded-lg bg-[var(--radio-screen)] px-2.5 py-2">
+              {/* 频段头（随选中点亮）+ 音量读数（右上角，紧邻音量旋钮） */}
               <div className="flex items-center justify-between text-[9px] font-bold tracking-wider">
                 <span className="flex gap-2">
                   {BANDS.map((b) => (
@@ -286,87 +296,101 @@ export function RetroRadio({
                     </span>
                   ))}
                 </span>
-                <span className="font-mono text-[11px] text-[var(--color-accent)]">
-                  {freq.toFixed(1)} MHz
-                </span>
-              </div>
-
-              {/* 频道名（液晶屏绿字，超长跑马灯滚动） */}
-              <div className="mt-1 min-w-0 overflow-hidden whitespace-nowrap">
-                <span
-                  className={`inline-block text-sm font-bold text-[var(--color-success)] ${marquee ? "lcd-marquee" : ""}`}
-                >
-                  {marquee ? (
-                    <>
-                      {name}
-                      <span aria-hidden="true">
-                        {"\u00A0\u00A0\u00A0\u00A0"}
-                        {name}
-                      </span>
-                    </>
-                  ) : (
-                    name
-                  )}
+                <span className="flex items-center gap-1.5">
+                  <svg
+                    aria-hidden="true"
+                    width="11"
+                    height="11"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="shrink-0 text-[var(--color-accent)]"
+                  >
+                    <path d="M11 5L6 9H2v6h4l5 4V5z" fill="currentColor" stroke="none" />
+                    <path d="M15.5 8.5a5 5 0 0 1 0 7" />
+                    <path d="M19 5a9 9 0 0 1 0 14" />
+                  </svg>
+                  <span className="font-mono text-[10px] text-[var(--color-accent)]">
+                    {volPercent}
+                  </span>
+                  {Array.from({ length: 6 }, (_, i) => (
+                    <span
+                      key={i}
+                      aria-hidden="true"
+                      className={`h-1.5 w-1.5 rounded-full transition-colors duration-150 ${
+                        i < Math.round((volPercent / 100) * 6)
+                          ? "bg-[var(--color-accent)]"
+                          : "bg-white/25"
+                      }`}
+                    />
+                  ))}
                 </span>
               </div>
 
               {/* 调频刻度 + 指针 */}
-              <div className="relative mt-1.5 h-2 rounded-full bg-white/10">
-                {ticks.map((t) => (
+              <div className="relative mt-1.5 h-2 shrink-0 rounded-full bg-white/10" aria-hidden="true">
+                {FREQ_TICKS.map((t) => (
                   <span
                     key={t}
-                    aria-hidden="true"
                     className="absolute top-1/2 h-2 w-px -translate-y-1/2 bg-white/30"
                     style={{ left: `${((t - FREQ_MIN) / (FREQ_MAX - FREQ_MIN)) * 100}%` }}
                   />
                 ))}
                 <span
-                  aria-hidden="true"
-                  className="absolute top-1/2 h-4 w-[3px] -translate-y-1/2 rounded-full bg-danger transition-[left] duration-500"
-                  style={{ left: `${needleLeft}%` }}
-                />
+                  className="absolute top-1/2 left-0 h-4 w-full transition-transform duration-500"
+                  style={{
+                    transform: `translateY(-50%) translateX(${((freq - FREQ_MIN) / (FREQ_MAX - FREQ_MIN)) * 100}%)`,
+                  }}
+                >
+                  <span className="absolute top-0 left-0 -ml-[1.5px] h-full w-[3px] rounded-full bg-danger" />
+                </span>
               </div>
-              <div className="mt-0.5 flex items-center justify-between text-[8px] text-white/35">
+              <div
+                className="mt-0.5 flex shrink-0 items-center justify-between text-[8px] text-white/35"
+                aria-hidden="true"
+              >
                 <span>{FREQ_MIN}</span>
+                <span className="font-mono text-[10px] font-bold text-[var(--color-accent)]">
+                  {freq.toFixed(1)} MHz
+                </span>
                 <span>{FREQ_MAX}</span>
               </div>
 
-              {/* 音量读数 + 状态点排 */}
-              <div className="absolute inset-x-2.5 bottom-1.5 flex items-center gap-1.5">
-                <svg
-                  aria-hidden="true"
-                  width="12"
-                  height="12"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className="shrink-0 text-[var(--color-accent)]"
-                >
-                  <path d="M11 5L6 9H2v6h4l5 4V5z" fill="currentColor" stroke="none" />
-                  <path d="M15.5 8.5a5 5 0 0 1 0 7" />
-                  <path d="M19 5a9 9 0 0 1 0 14" />
-                </svg>
-                <span className="sr-only">音量 {volPercent}%</span>
-                <span
-                  aria-hidden="true"
-                  className="font-mono text-[10px] font-bold text-[var(--color-accent)]"
-                >
-                  {volPercent}
-                </span>
-                {Array.from({ length: 6 }, (_, i) => (
-                  <span
-                    key={i}
-                    aria-hidden="true"
-                    className={`h-1.5 w-1.5 rounded-full transition-colors duration-150 ${
-                      i < Math.round((volPercent / 100) * 6)
-                        ? "bg-[var(--color-accent)]"
-                        : "bg-white/25"
-                    }`}
-                  />
-                ))}
+              {/* 频道列表视窗（调台旋钮驱动选中项，绿字高亮当前台） */}
+              <div className="mt-1 min-h-0 flex-1 overflow-hidden" aria-hidden="true">
+                {channels.length === 0 ? (
+                  <p className="px-0.5 text-[10px] leading-[18px] text-white/35">
+                    {listTab === "favorites" ? "暂无收藏电台" : "暂无播放记录"}
+                  </p>
+                ) : (
+                  <div
+                    className="transition-transform duration-200"
+                    style={{ transform: `translateY(-${listOffset}px)` }}
+                  >
+                    {channels.map((s, i) => {
+                      const selected = i === channelIndex;
+                      return (
+                        <div
+                          key={s.uuid}
+                          className={`flex items-center gap-1.5 whitespace-nowrap text-[11px] leading-[18px] ${
+                            selected ? "font-bold text-[var(--color-success)]" : "text-white/55"
+                          }`}
+                        >
+                          <span className="w-4 shrink-0 text-right font-mono text-[9px] text-white/30">
+                            {i + 1}
+                          </span>
+                          <span className="truncate">
+                            {selected ? "▶ " : ""}
+                            {s.name}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             </div>
 
@@ -500,6 +524,35 @@ export function RetroRadio({
         >
           <span className="block h-full w-full rounded-full bg-gradient-to-b from-[var(--radio-knob-1)] to-[var(--radio-knob-2)]" />
         </div>
+
+        {/* 右缘中：随机播放侧键（实体按键质感，按压时向左按入机身，从全部频道随机挑一个播放） */}
+        <button
+          type="button"
+          onClick={onRandom}
+          disabled={randomLoading}
+          aria-busy={randomLoading}
+          aria-label="随机播放一个频道"
+          className="absolute -right-3 top-1/2 z-20 flex h-12 w-3 -translate-y-1/2 items-center justify-center rounded-r-md bg-gradient-to-b from-[var(--radio-knob-1)] to-[var(--radio-knob-2)] shadow-md ring-1 ring-black/30 transition-[translate,box-shadow] duration-150 hover:brightness-105 active:-translate-x-[3px] active:shadow-sm disabled:opacity-60 after:absolute after:-inset-x-4 after:-inset-y-2 after:content-[''] focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+        >
+          <svg
+            aria-hidden="true"
+            width="9"
+            height="9"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="3"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="text-[var(--radio-body-2)]"
+          >
+            <path d="M2 18h1.4c1.3 0 2.5-.6 3.3-1.7l6.1-8.6c.8-1.1 2-1.7 3.3-1.7H22" />
+            <path d="m18 2 4 4-4 4" />
+            <path d="M2 6h1.9c1.5 0 2.9.9 3.6 2.2" />
+            <path d="M22 18h-5.9c-1.3 0-2.6-.7-3.3-1.8l-.5-.8" />
+            <path d="m18 14 4 4-4 4" />
+          </svg>
+        </button>
       </div>
     </div>
   );
