@@ -80,23 +80,29 @@ export function RadioHome({ onBrowse }: RadioHomeProps) {
   const [randomLoading, setRandomLoading] = useState(false);
   const [randomError, setRandomError] = useState<string | null>(null);
 
-  /** 随便听听：从全库随机挑一个电台直接播放（order=random 取若干个，取首个可播的） */
+  /** 随机播放：从全库随机挑一个电台直接播放（order=random 取若干个，取首个可播的）。
+   *  空闲态是「随便听听」入口，播放中是「换一个」切台，两处共用本逻辑与状态 */
   const playRandom = useCallback(async () => {
     if (randomLoading) return;
     setRandomLoading(true);
     setRandomError(null);
     try {
-      const res = await fetch("/api/stations?order=random&limit=10");
+      // 上游对 order=random 有短时缓存（缓存窗内同一批结果），
+      // 所以一次拉 50 个候选，在本地随机抽一个，保证每次点击都换台
+      const res = await fetch(`/api/stations?order=random&limit=50&_=${Date.now()}`);
       if (!res.ok) throw new Error();
       const data = (await res.json()) as { items: Station[] };
-      if (data.items.length === 0) throw new Error();
-      playStation(data.items[0]);
+      // 排除当前正在播的台，确保频道一定变化
+      const candidates = data.items.filter((s) => s.uuid !== current?.uuid);
+      if (candidates.length === 0) throw new Error();
+      const pick = candidates[Math.floor(Math.random() * candidates.length)];
+      playStation(pick);
     } catch {
       setRandomError("没挑到电台，再试一次吧");
     } finally {
       setRandomLoading(false);
     }
-  }, [playStation, randomLoading]);
+  }, [playStation, randomLoading, current]);
 
   const isLoading = state === "loading";
   const isPlaying = state === "playing";
@@ -117,6 +123,7 @@ export function RadioHome({ onBrowse }: RadioHomeProps) {
         <RetroRadio
           station={current}
           isPlaying={isPlaying}
+          isLoading={isLoading}
           onToggle={toggle}
           listTab={listTab}
           onListTabChange={setListTab}
@@ -170,6 +177,23 @@ export function RadioHome({ onBrowse }: RadioHomeProps) {
             )}
           </div>
         )}
+        {current && (
+          <button
+            type="button"
+            onClick={() => void playRandom()}
+            disabled={randomLoading}
+            aria-busy={randomLoading}
+            className="mt-0.5 flex min-h-[44px] items-center justify-center gap-1.5 rounded-full px-4 text-xs font-medium text-text-muted transition-colors hover:text-text focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-50"
+          >
+            <span aria-hidden="true">🎲</span>
+            {randomLoading ? "正在换一个…" : "换一个"}
+          </button>
+        )}
+        {current && randomError && (
+          <p role="alert" className="text-xs text-danger">
+            {randomError}
+          </p>
+        )}
       </div>
 
       <section
@@ -186,7 +210,7 @@ export function RadioHome({ onBrowse }: RadioHomeProps) {
             role="tab"
             aria-selected={listTab === "favorites"}
             onClick={() => setListTab("favorites")}
-            className={`flex min-h-[36px] min-w-[44px] flex-1 items-center justify-center rounded-full px-3 text-sm font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent ${
+            className={`flex min-h-[44px] min-w-[44px] flex-1 items-center justify-center rounded-full px-3 text-sm font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent ${
               listTab === "favorites"
                 ? "bg-surface-2 text-text shadow-sm"
                 : "text-text-muted hover:text-text"
@@ -199,7 +223,7 @@ export function RadioHome({ onBrowse }: RadioHomeProps) {
             role="tab"
             aria-selected={listTab === "history"}
             onClick={() => setListTab("history")}
-            className={`flex min-h-[36px] min-w-[44px] flex-1 items-center justify-center rounded-full px-3 text-sm font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent ${
+            className={`flex min-h-[44px] min-w-[44px] flex-1 items-center justify-center rounded-full px-3 text-sm font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent ${
               listTab === "history"
                 ? "bg-surface-2 text-text shadow-sm"
                 : "text-text-muted hover:text-text"

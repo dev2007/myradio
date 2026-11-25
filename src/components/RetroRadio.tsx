@@ -19,6 +19,7 @@ const FREQ_MAX = 108;
 interface RetroRadioProps {
   station: Station | null;
   isPlaying: boolean;
+  isLoading: boolean;
   onToggle: () => void;
   listTab: "favorites" | "history";
   onListTabChange: (tab: "favorites" | "history") => void;
@@ -37,6 +38,7 @@ const CHANNEL_STEP_DEG = 30;
 export function RetroRadio({
   station,
   isPlaying,
+  isLoading,
   onToggle,
   listTab,
   onListTabChange,
@@ -222,7 +224,7 @@ export function RetroRadio({
       </div>
 
       {/* 机身（红色） */}
-      <div className="relative mt-16 aspect-[16/9] w-full rounded-[1.75rem] border border-black/25 bg-gradient-to-b from-[var(--radio-body-1)] to-[var(--radio-body-2)] px-3 pb-[18px] pt-[18px] pr-9 shadow-2xl">
+      <div className="relative mt-16 aspect-[16/9] w-full rounded-[1.75rem] border border-black/25 bg-gradient-to-b from-[var(--radio-body-1)] to-[var(--radio-body-2)] px-3 pb-[18px] pt-[18px] pr-11 shadow-2xl">
         {/* 顶部/底部防滑条纹 */}
         <div
           aria-hidden="true"
@@ -381,7 +383,9 @@ export function RetroRadio({
                       : `播放 ${station.name}`
                     : "暂无播放中的电台"
                 }
-                className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-gradient-to-b from-[#f6f1e7] to-[#d8cfbf] text-[var(--radio-body-2)] shadow-lg shadow-black/30 ring-2 ring-black/20 transition-transform duration-150 hover:scale-[1.04] active:scale-95 disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+                className={`relative flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-gradient-to-b from-[#f6f1e7] to-[#d8cfbf] text-[var(--radio-body-2)] shadow-lg shadow-black/30 ring-2 ring-black/20 transition-transform duration-150 hover:scale-[1.04] active:scale-95 disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent ${
+                  isLoading ? "power-loading" : ""
+                }`}
               >
                 {isPlaying ? (
                   <svg aria-hidden="true" width="18" height="18" viewBox="0 0 16 16" fill="currentColor">
