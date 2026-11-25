@@ -224,11 +224,12 @@ body {
 }
 
 .machine-eq span {
-  width: 5px;
-  height: 20%;
-  border-radius: 2px;
+  width: 10px;
+  height: 100%;
+  border-radius: 3px;
   background: var(--color-accent);
   transform-origin: bottom;
+  transform: scaleY(0.2);
   opacity: 0.45;
 }
 
@@ -247,10 +248,10 @@ body {
 
 @keyframes machine-eq-bounce {
   from {
-    height: 20%;
+    transform: scaleY(0.2);
   }
   to {
-    height: 90%;
+    transform: scaleY(1);
   }
 }
 

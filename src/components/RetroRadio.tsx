@@ -62,10 +62,11 @@ export function RetroRadio({
   const knobRef = useRef<HTMLDivElement | null>(null);
   const tuningRef = useRef<HTMLDivElement | null>(null);
   const tuningDragRef = useRef<number | null>(null);
-  const tuningAccRef = useRef(0);
-  const tuningAngleRef = useRef(0);
+  /** 调台棘轮模型：detent 为虚拟档位计数，pos 为连续累积角度；
+   *  每跨过一档恰好切换一个频道，到列表尽头即机械止点（不再积攒死行程） */
+  const tuningDetentRef = useRef(0);
+  const tuningPosRef = useRef(0);
   const [tuningAngle, setTuningAngle] = useState(0);
-  const [tuningDragging, setTuningDragging] = useState(false);
   const dragRef = useRef<{ lastAngle: number; volume: number } | null>(null);
 
   const pointerAngle = useCallback(
@@ -134,27 +135,23 @@ export function RetroRadio({
     [setVolume, volPercent]
   );
 
-  /** 转动调台旋钮：在当前列表（收藏/历史）中按 offset 切换频道 */
-  const selectChannel = useCallback(
-    (offset: number) => {
-      if (channels.length === 0 || offset === 0) return;
+  /** 向 dir 方向转一档：切换到列表中相邻频道，到头返回 false（机械止点） */
+  const turnDetents = useCallback(
+    (dir: number): boolean => {
+      if (channels.length === 0 || dir === 0) return false;
       const idx = channels.findIndex((s) => s.uuid === station?.uuid);
-      // 当前电台不在列表中时，任意方向的第一格先选中列表第一个频道
-      const next = idx === -1 ? 0 : idx + offset;
-      if (next < 0 || next >= channels.length) return; // 已到头，不再切换
-      onChannelSelect(channels[next]);
+      // 当前电台不在列表中时，任意方向的第一档先选中列表第一个频道
+      const at = idx === -1 ? 0 : idx + dir;
+      if (at < 0 || at >= channels.length) return false;
+      onChannelSelect(channels[at]);
+      return true;
     },
     [channels, onChannelSelect, station]
   );
 
-  /** 松手/取消时结束拖拽，并平滑吸附到最近档位（此时 transition 生效） */
+  /** 松手/取消时结束拖拽（视觉始终吸附在档位上，无需再吸附） */
   const endTuningDrag = useCallback(() => {
     tuningDragRef.current = null;
-    setTuningDragging(false);
-    const snapped = Math.round(tuningAngleRef.current / CHANNEL_STEP_DEG) * CHANNEL_STEP_DEG;
-    tuningAngleRef.current = snapped;
-    setTuningAngle(snapped);
-    tuningAccRef.current = 0;
   }, []);
 
   const onTuningPointerDown = useCallback(
@@ -163,9 +160,7 @@ export function RetroRadio({
       if (!el) return;
       if (e.pointerType === "mouse" && e.button !== 0) return;
       el.setPointerCapture(e.pointerId);
-      tuningAccRef.current = 0;
       tuningDragRef.current = pointerAngle(el, e.clientX, e.clientY);
-      setTuningDragging(true);
     },
     [pointerAngle]
   );
@@ -181,19 +176,28 @@ export function RetroRadio({
       let delta = angle - tuningDragRef.current;
       delta = ((delta + 540) % 360) - 180;
       tuningDragRef.current = angle;
-      // 旋钮视觉角度跟随手指连续旋转（拖拽中无 transition，跟手不延迟）
-      tuningAngleRef.current += delta;
-      setTuningAngle(tuningAngleRef.current);
-      // 大阻尼：角度累积，每满一格（30°）才切换一个频道，到头后不再切换
-      tuningAccRef.current += delta;
-      const steps = Math.floor(Math.abs(tuningAccRef.current) / CHANNEL_STEP_DEG);
-      if (steps > 0) {
-        const dir = tuningAccRef.current > 0 ? 1 : -1;
-        tuningAccRef.current -= dir * steps * CHANNEL_STEP_DEG;
-        selectChannel(dir * steps);
+      // 连续累积角度，换算目标档位；每跨过一档切一台
+      tuningPosRef.current += delta;
+      const target = Math.round(tuningPosRef.current / CHANNEL_STEP_DEG);
+      const want = target - tuningDetentRef.current;
+      if (want === 0) return;
+      const dir = want > 0 ? 1 : -1;
+      const idx = channels.findIndex((s) => s.uuid === station?.uuid);
+      // 允许推进的档数受列表范围限制（电台不在列表时只能先跳到第一个）
+      const allowed = Math.min(
+        Math.abs(want),
+        idx === -1 ? 1 : dir > 0 ? channels.length - 1 - idx : idx
+      );
+      if (allowed > 0) {
+        // 一次事件内跨多档只触发一次选台，落到最终档位对应的频道
+        onChannelSelect(channels[idx === -1 ? 0 : idx + dir * allowed]);
+        tuningDetentRef.current += dir * allowed;
       }
+      // 完成切换或到达限位后，虚拟位置都回到当前档位（机械止点，不积攒死行程）
+      tuningPosRef.current = tuningDetentRef.current * CHANNEL_STEP_DEG;
+      setTuningAngle(tuningDetentRef.current * CHANNEL_STEP_DEG);
     },
-    [pointerAngle, selectChannel, endTuningDrag]
+    [pointerAngle, channels, station, onChannelSelect, endTuningDrag]
   );
 
   const onTuningKeyDown = useCallback(
@@ -206,11 +210,12 @@ export function RetroRadio({
             : 0;
       if (dir === 0) return;
       e.preventDefault();
-      tuningAngleRef.current += dir * CHANNEL_STEP_DEG;
-      setTuningAngle(tuningAngleRef.current);
-      selectChannel(dir);
+      if (turnDetents(dir)) {
+        tuningDetentRef.current += dir;
+        setTuningAngle(tuningDetentRef.current * CHANNEL_STEP_DEG);
+      }
     },
-    [selectChannel]
+    [turnDetents]
   );
 
   const knobRotation = volPercent * DEG_PER_PERCENT;
@@ -268,7 +273,7 @@ export function RetroRadio({
             />
             <div
               aria-hidden="true"
-              className="machine-eq absolute inset-x-0 bottom-0 flex h-2/5 items-end justify-center gap-1.5 pb-2"
+              className="machine-eq absolute inset-x-0 bottom-0 flex h-2/5 items-end justify-center gap-2 pb-8"
             >
               <span />
               <span className="eq-2" />
@@ -517,9 +522,7 @@ export function RetroRadio({
           onPointerUp={endTuningDrag}
           onPointerCancel={endTuningDrag}
           onKeyDown={onTuningKeyDown}
-          className={`knob-ticks absolute -right-3 bottom-9 z-20 h-10 w-10 cursor-grab touch-none rounded-full p-[3px] shadow-lg ring-2 ring-black/30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent active:cursor-grabbing ${
-            tuningDragging ? "" : "transition-transform duration-200"
-          }`}
+          className="knob-ticks absolute -right-3 bottom-9 z-20 h-10 w-10 cursor-grab touch-none rounded-full p-[3px] shadow-lg ring-2 ring-black/30 transition-transform duration-150 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent active:cursor-grabbing"
           style={{ transform: `rotate(${tuningAngle}deg)` }}
         >
           <span className="block h-full w-full rounded-full bg-gradient-to-b from-[var(--radio-knob-1)] to-[var(--radio-knob-2)]" />

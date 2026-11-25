@@ -72,7 +72,9 @@ export function RadioHome({ onBrowse }: RadioHomeProps) {
         />
       </div>
 
-      <div className="flex shrink-0 flex-col items-center gap-1 text-center">
+      {/* 信息区预留固定高度（覆盖浏览按钮/状态/错误各状态的最大高度），
+          避免播放状态切换时内容高度变化导致居中布局里收音机上下跳动 */}
+      <div className="flex min-h-[68px] shrink-0 flex-col items-center justify-center gap-1 text-center">
         {current && (
           <p className="text-sm text-text-muted">
             {current.country || "未知地区"}
