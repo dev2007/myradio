@@ -1,0 +1,288 @@
+@import "tailwindcss";
+
+/* ---------- 主题 token：默认浅色，[data-theme="dark"] 深色 ----------
+   参照 refactoring-ui/theming-dark-mode：
+   - 深色用深灰不用纯黑（避免 halation）
+   - 浅色用白表面 + 分层灰
+   - 文字三级层次，muted 保持 AA 对比度 */
+:root {
+  /* 背景层次 */
+  --color-bg: #f4f5f8;
+  --color-surface: #ffffff;
+  --color-surface-2: #eef0f5;
+  /* 主色：与收音机机身一致的降饱和复古红（浅色下用更深的可读档位） */
+  --color-primary: #b3463b;
+  --color-primary-light: #7e2a22;
+  --color-accent: #0891b2;
+  /* 文字三级 */
+  --color-text: #1e2433;
+  --color-text-muted: #5b6472;
+  /* 功能色 */
+  --color-success: #059669;
+  --color-danger: #dc2626;
+  --color-warning: #d97706;
+  --color-border: rgba(30, 41, 59, 0.14);
+  /* 背景氛围光 */
+  --bg-glow: rgba(179, 70, 59, 0.08);
+  /* 复古收音机配色（浅色：降饱和复古红 5 档色阶，暖灰旋钮不用纯黑） */
+  --radio-body-1: #b3463b;
+  --radio-body-2: #7e2a22;
+  --radio-grille: #2f1a15;
+  --radio-knob-1: #4a403c;
+  --radio-knob-2: #2b2422;
+  --radio-screen: #10141f;
+}
+
+[data-theme="dark"] {
+  --color-bg: #1b202e;
+  --color-surface: #252b3c;
+  --color-surface-2: #303852;
+  --color-primary: #cb4f3b;
+  --color-primary-light: #f0826f;
+  --color-accent: #22d3ee;
+  --color-text: #f1f5f9;
+  --color-text-muted: #9aa5b5;
+  --color-success: #34d399;
+  --color-danger: #f87171;
+  --color-warning: #fbbf24;
+  --color-border: rgba(148, 163, 184, 0.18);
+  --bg-glow: rgba(203, 79, 59, 0.12);
+  /* 复古收音机配色（深色：暗红机身） */
+  --radio-body-1: #8f332b;
+  --radio-body-2: #5c211b;
+  --radio-grille: #1a0f0c;
+  --radio-knob-1: #383029;
+  --radio-knob-2: #1c1715;
+  --radio-screen: #0c101a;
+}
+
+/* 无显式选择（无 data-theme）时跟随系统深浅色；
+   用户点过切换按钮后由服务端 cookie 写入 data-theme，显式选择优先于系统偏好 */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    --color-bg: #1b202e;
+    --color-surface: #252b3c;
+    --color-surface-2: #303852;
+    --color-primary: #cb4f3b;
+    --color-primary-light: #f0826f;
+    --color-accent: #22d3ee;
+    --color-text: #f1f5f9;
+    --color-text-muted: #9aa5b5;
+    --color-success: #34d399;
+    --color-danger: #f87171;
+    --color-warning: #fbbf24;
+    --color-border: rgba(148, 163, 184, 0.18);
+    --bg-glow: rgba(203, 79, 59, 0.12);
+    --radio-body-1: #8f332b;
+    --radio-body-2: #5c211b;
+    --radio-grille: #1a0f0c;
+    --radio-knob-1: #383029;
+    --radio-knob-2: #1c1715;
+    --radio-screen: #0c101a;
+  }
+}
+
+@theme inline {
+  --color-bg: var(--color-bg);
+  --color-surface: var(--color-surface);
+  --color-surface-2: var(--color-surface-2);
+  --color-primary: var(--color-primary);
+  --color-primary-light: var(--color-primary-light);
+  --color-accent: var(--color-accent);
+  --color-text: var(--color-text);
+  --color-text-muted: var(--color-text-muted);
+  --color-success: var(--color-success);
+  --color-danger: var(--color-danger);
+  --color-warning: var(--color-warning);
+  --color-border: var(--color-border);
+}
+
+html {
+  /* 消除移动端点按延迟歧义 */
+  touch-action: manipulation;
+  color-scheme: light;
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    color-scheme: dark;
+  }
+}
+
+body {
+  background:
+    radial-gradient(ellipse 80% 50% at 50% -20%, var(--bg-glow), transparent),
+    var(--color-bg);
+  color: var(--color-text);
+  font-family:
+    Inter,
+    -apple-system,
+    BlinkMacSystemFont,
+    "PingFang SC",
+    "Microsoft YaHei",
+    "Segoe UI",
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* 统一键盘焦点环（web-interface-guidelines） */
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+/* 移动端安全区辅助类 */
+.safe-bottom {
+  padding-bottom: max(0px, env(safe-area-inset-bottom));
+}
+
+.safe-top {
+  padding-top: max(0px, env(safe-area-inset-top));
+}
+
+/* 播放中均衡器动画 */
+.eq-bars {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 12px;
+}
+
+.eq-bar {
+  width: 3px;
+  height: 100%;
+  border-radius: 1px;
+  background: var(--color-accent);
+  transform-origin: bottom;
+  animation: eq-bounce 0.7s ease-in-out infinite alternate;
+}
+
+.eq-bar-2 {
+  animation-delay: 0.2s;
+}
+
+.eq-bar-3 {
+  animation-delay: 0.4s;
+}
+
+@keyframes eq-bounce {
+  from {
+    transform: scaleY(0.3);
+  }
+  to {
+    transform: scaleY(1);
+  }
+}
+
+/* 隐藏横向滚动条（移动端筛选 chips） */
+.no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* 旋钮白色刻度环：repeating-conic-gradient 生成，旋钮本体盖住中心只露边缘刻度 */
+.knob-ticks {
+  background-color: var(--radio-knob-2);
+  background-image: repeating-conic-gradient(
+    rgba(255, 255, 255, 0.9) 0deg 5deg,
+    transparent 5deg 30deg
+  );
+}
+
+/* 复古收音机播放态动画（reduced-motion 下由全局规则禁用） */
+.radio-playing .antenna {
+  animation: antenna-sway 2.2s ease-in-out infinite;
+  transform-origin: 10% 100%;
+}
+
+@keyframes antenna-sway {
+  0%,
+  100% {
+    rotate: -30deg;
+  }
+  50% {
+    rotate: -36deg;
+  }
+}
+
+/* 液晶屏频道名跑马灯（名称过长时滚动） */
+.lcd-marquee {
+  animation: lcd-slide 9s linear infinite;
+}
+
+@keyframes lcd-slide {
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.machine-eq span {
+  width: 5px;
+  height: 20%;
+  border-radius: 2px;
+  background: var(--color-accent);
+  transform-origin: bottom;
+  opacity: 0.45;
+}
+
+.radio-playing .machine-eq span {
+  opacity: 1;
+  animation: machine-eq-bounce 0.6s ease-in-out infinite alternate;
+}
+
+.machine-eq span.eq-2 {
+  animation-delay: 0.15s;
+}
+
+.machine-eq span.eq-3 {
+  animation-delay: 0.3s;
+}
+
+@keyframes machine-eq-bounce {
+  from {
+    height: 20%;
+  }
+  to {
+    height: 90%;
+  }
+}
+
+.radio-playing .knob-vol {
+  animation: knob-spin 6s linear infinite;
+}
+
+@keyframes knob-spin {
+  to {
+    rotate: 360deg;
+  }
+}
+
+.led {
+  background: color-mix(in srgb, var(--color-danger) 25%, transparent);
+  transition: background-color 0.3s, box-shadow 0.3s;
+}
+
+.radio-playing .led {
+  background: var(--color-danger);
+  box-shadow: 0 0 10px var(--color-danger);
+}
+
+/* 动效降级：用户偏好减少动效时全部禁用 */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
