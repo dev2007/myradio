@@ -223,6 +223,22 @@ body {
   }
 }
 
+/* 睡眠定时待确认闪烁：高亮色与液晶屏主体色硬切换（reduced-motion 下由全局规则禁用） */
+.sleep-blink {
+  animation: sleep-blink 1s linear infinite;
+}
+
+@keyframes sleep-blink {
+  0%,
+  50% {
+    color: var(--color-accent);
+  }
+  50.01%,
+  100% {
+    color: var(--radio-screen);
+  }
+}
+
 .machine-eq span {
   width: 10px;
   height: 100%;

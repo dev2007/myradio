@@ -24,6 +24,12 @@ interface RetroRadioProps {
   onChannelSelect: (station: Station) => void;
   onRandom: () => void;
   randomLoading: boolean;
+  /** 睡眠定时剩余秒数；null 表示未启用 */
+  sleepRemaining: number | null;
+  /** 待确认的定时时长（分钟） */
+  sleepPending: number | null;
+  /** 按压睡眠键：循环切换时长/取消 */
+  onPressSleepTimer: () => void;
 }
 
 const BANDS = ["FM", "AM", "SW"] as const;
@@ -34,14 +40,16 @@ const DEG_PER_PERCENT = 3;
 /** 调台旋钮：每转动 30° 才切换一个频道（大阻尼，一格一格精准切换，一圈最多 12 个台） */
 const CHANNEL_STEP_DEG = 30;
 
-/** 液晶屏频道列表视窗：行高 18px，可视约 6 行，选中项保持在视窗内 */
-const LCD_ROW_H = 18;
+/** 液晶屏频道列表视窗：行高 20px，可视约 6 行，选中项保持在视窗内 */
+const LCD_ROW_H = 20;
 const LCD_VISIBLE = 6;
 
 const FREQ_MIN = 88;
 const FREQ_MAX = 108;
 /** 刻度线：每 2MHz 一条，共 11 条 */
 const FREQ_TICKS = Array.from({ length: 11 }, (_, i) => FREQ_MIN + i * 2);
+
+
 
 export function RetroRadio({
   station,
@@ -54,6 +62,9 @@ export function RetroRadio({
   onChannelSelect,
   onRandom,
   randomLoading,
+  sleepRemaining,
+  sleepPending,
+  onPressSleepTimer,
 }: RetroRadioProps) {
   const { volume, setVolume } = usePlayer();
   const { isFavorite, toggleFavorite } = useFavorites();
@@ -68,6 +79,16 @@ export function RetroRadio({
   const tuningPosRef = useRef(0);
   const [tuningAngle, setTuningAngle] = useState(0);
   const dragRef = useRef<{ lastAngle: number; volume: number } | null>(null);
+
+  const sleepActive = sleepRemaining !== null;
+  const sleepPendingActive = sleepPending !== null;
+  /** 液晶屏顶部显示的睡眠时间：待确认档位（未开始）或进行中的倒计时 */
+  const sleepText =
+    sleepPending !== null
+      ? `${sleepPending}:00`
+      : sleepRemaining !== null
+        ? `${Math.floor(sleepRemaining / 60)}:${String(sleepRemaining % 60).padStart(2, "0")}`
+        : null;
 
   const pointerAngle = useCallback(
     (el: HTMLElement | null, clientX: number, clientY: number): number => {
@@ -228,7 +249,7 @@ export function RetroRadio({
 
   return (
     <div
-      className={`radio-machine relative mx-auto w-full max-w-[min(100%,calc((100dvh_-_240px)*1.7778))] ${isPlaying ? "radio-playing" : ""}`}
+      className={`radio-machine relative mx-auto w-full max-w-[min(100%,calc((100dvh_-_232px)*1.7778),768px)] ${isPlaying ? "radio-playing" : ""}`}
     >
       {/* 天线（右上，播放时摆动） */}
       <div
@@ -239,7 +260,7 @@ export function RetroRadio({
       </div>
 
       {/* 机身（红色） */}
-      <div className="relative mt-16 aspect-[16/9] w-full rounded-[1.75rem] border border-black/25 bg-gradient-to-b from-[var(--radio-body-1)] to-[var(--radio-body-2)] px-3 pb-[18px] pt-[18px] pr-11 shadow-2xl">
+      <div className="relative mt-16 aspect-[16/9] w-full rounded-[1.75rem] border border-black/25 bg-gradient-to-b from-[var(--radio-body-1)] to-[var(--radio-body-2)] px-3 pb-[18px] pt-[18px] pr-14 shadow-2xl">
         {/* 顶部/底部防滑条纹 */}
         <div
           aria-hidden="true"
@@ -292,14 +313,40 @@ export function RetroRadio({
           {/* 右：液晶屏 + 控制排 */}
           <div className="flex min-w-0 flex-1 flex-col gap-2">
             <div className="relative flex flex-1 flex-col overflow-hidden rounded-lg bg-[var(--radio-screen)] px-2.5 py-2">
-              {/* 频段头（随选中点亮）+ 音量读数（右上角，紧邻音量旋钮） */}
-              <div className="flex items-center justify-between text-[9px] font-bold tracking-wider">
-                <span className="flex gap-2">
-                  {BANDS.map((b) => (
-                    <span key={b} className={b === "FM" ? "text-white/95" : "text-white/40"}>
-                      {b}
+              {/* 频段头（随选中点亮）+ 睡眠时间（待确认闪烁，开始后稳定倒计时）+ 音量读数 */}
+              <div className="flex items-center justify-between text-[10px] font-bold tracking-wider">
+                <span className="flex items-center gap-2">
+                  <span className="flex gap-2">
+                    {BANDS.map((b) => (
+                      <span key={b} className={b === "FM" ? "text-white/95" : "text-white/40"}>
+                        {b}
+                      </span>
+                    ))}
+                  </span>
+                  {sleepText && (
+                    <span
+                      aria-hidden="true"
+                      className={`flex items-center gap-1 font-mono text-[11px] font-bold text-[var(--color-accent)] ${
+                        sleepPendingActive
+                          ? "sleep-blink"
+                          : "[text-shadow:0_0_6px_rgba(45,212,191,0.45)]"
+                      }`}
+                    >
+                      <svg
+                        width="9"
+                        height="9"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="3"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9z" />
+                      </svg>
+                      {sleepText}
                     </span>
-                  ))}
+                  )}
                 </span>
                 <span className="flex items-center gap-1.5">
                   <svg
@@ -318,7 +365,7 @@ export function RetroRadio({
                     <path d="M15.5 8.5a5 5 0 0 1 0 7" />
                     <path d="M19 5a9 9 0 0 1 0 14" />
                   </svg>
-                  <span className="font-mono text-[10px] text-[var(--color-accent)]">
+                  <span className="font-mono text-[11px] text-[var(--color-accent)]">
                     {volPercent}
                   </span>
                   {Array.from({ length: 6 }, (_, i) => (
@@ -354,11 +401,11 @@ export function RetroRadio({
                 </span>
               </div>
               <div
-                className="mt-0.5 flex shrink-0 items-center justify-between text-[8px] text-white/35"
+                className="mt-0.5 flex shrink-0 items-center justify-between text-[9px] text-white/35"
                 aria-hidden="true"
               >
                 <span>{FREQ_MIN}</span>
-                <span className="font-mono text-[10px] font-bold text-[var(--color-accent)]">
+                <span className="font-mono text-[11px] font-bold text-[var(--color-accent)]">
                   {freq.toFixed(1)} MHz
                 </span>
                 <span>{FREQ_MAX}</span>
@@ -380,11 +427,11 @@ export function RetroRadio({
                       return (
                         <div
                           key={s.uuid}
-                          className={`flex items-center gap-1.5 whitespace-nowrap text-[11px] leading-[18px] ${
+                          className={`flex items-center gap-1.5 whitespace-nowrap text-[12px] leading-[20px] ${
                             selected ? "font-bold text-[var(--color-success)]" : "text-white/55"
                           }`}
                         >
-                          <span className="w-4 shrink-0 text-right font-mono text-[9px] text-white/30">
+                          <span className="w-4 shrink-0 text-right font-mono text-[10px] text-white/30">
                             {i + 1}
                           </span>
                           <span className="truncate">
@@ -460,6 +507,8 @@ export function RetroRadio({
                   <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7z" />
                 </svg>
               </button>
+              {/* 弹性空隙对称拆分：收藏/历史居中于剩余空间，避免单侧大空档 */}
+              <span className="min-w-2 flex-1" aria-hidden="true" />
               {(["favorites", "history"] as const).map((t) => (
                 <button
                   key={t}
@@ -467,7 +516,7 @@ export function RetroRadio({
                   onClick={() => onListTabChange(t)}
                   aria-pressed={listTab === t}
                   aria-label={t === "favorites" ? "切换到我的收藏列表" : "切换到历史播放列表"}
-                  className={`relative flex h-7 flex-1 items-center justify-center rounded-md text-[10px] font-bold shadow-inner transition-[background-color,box-shadow] duration-150 after:absolute after:inset-x-0 after:-inset-y-2 after:rounded-md after:content-[''] focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent ${
+                  className={`relative flex h-7 w-20 items-center justify-center rounded-md text-[10px] font-bold shadow-inner transition-[background-color,box-shadow] duration-150 after:absolute after:inset-x-0 after:-inset-y-2 after:rounded-md after:content-[''] focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent ${
                     listTab === t
                       ? "bg-gradient-to-b from-[#e8e6e1] to-[#a8a49c] text-[var(--radio-body-2)] shadow-[0_0_12px_rgba(255,255,255,0.55)]"
                       : "bg-black/30 text-white/60 hover:bg-black/40 hover:text-white/80"
@@ -476,6 +525,7 @@ export function RetroRadio({
                   {t === "favorites" ? "收藏" : "历史"}
                 </button>
               ))}
+              <span className="min-w-2 flex-1" aria-hidden="true" />
             </div>
           </div>
         </div>
@@ -499,7 +549,7 @@ export function RetroRadio({
             dragRef.current = null;
           }}
           onKeyDown={onKnobKeyDown}
-          className="knob-ticks absolute -right-4 top-7 z-20 h-14 w-14 cursor-grab touch-none rounded-full p-[4px] shadow-lg ring-2 ring-black/30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent active:cursor-grabbing"
+          className="knob-ticks absolute -right-5 top-6 z-20 h-16 w-16 cursor-grab touch-none rounded-full p-[4px] shadow-lg ring-2 ring-black/30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent active:cursor-grabbing"
           style={{ transform: `rotate(${knobRotation}deg)` }}
         >
           <span className="relative block h-full w-full rounded-full bg-gradient-to-b from-[var(--radio-knob-1)] to-[var(--radio-knob-2)]">
@@ -522,7 +572,7 @@ export function RetroRadio({
           onPointerUp={endTuningDrag}
           onPointerCancel={endTuningDrag}
           onKeyDown={onTuningKeyDown}
-          className="knob-ticks absolute -right-3 bottom-9 z-20 h-10 w-10 cursor-grab touch-none rounded-full p-[3px] shadow-lg ring-2 ring-black/30 transition-transform duration-150 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent active:cursor-grabbing"
+          className="knob-ticks absolute -right-5 bottom-6 z-20 h-16 w-16 cursor-grab touch-none rounded-full p-[4px] shadow-lg ring-2 ring-black/30 transition-transform duration-150 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent active:cursor-grabbing"
           style={{ transform: `rotate(${tuningAngle}deg)` }}
         >
           <span className="block h-full w-full rounded-full bg-gradient-to-b from-[var(--radio-knob-1)] to-[var(--radio-knob-2)]" />
@@ -535,7 +585,7 @@ export function RetroRadio({
           disabled={randomLoading}
           aria-busy={randomLoading}
           aria-label="随机播放一个频道"
-          className="absolute -right-3 top-1/2 z-20 flex h-12 w-3 -translate-y-1/2 items-center justify-center rounded-r-md bg-gradient-to-b from-[var(--radio-knob-1)] to-[var(--radio-knob-2)] shadow-md ring-1 ring-black/30 transition-[translate,box-shadow] duration-150 hover:brightness-105 active:-translate-x-[3px] active:shadow-sm disabled:opacity-60 after:absolute after:-inset-x-4 after:-inset-y-2 after:content-[''] focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+          className="absolute -right-3 top-1/2 z-20 flex h-14 w-4 origin-left -translate-y-1/2 items-center justify-center rounded-r-md bg-gradient-to-b from-[var(--radio-knob-1)] to-[var(--radio-knob-2)] shadow-md ring-1 ring-black/30 transition-[translate,scale,box-shadow] duration-150 hover:brightness-105 active:scale-x-[0.7] active:shadow-sm disabled:opacity-60 after:absolute after:-inset-x-4 after:-inset-y-2 after:content-[''] focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
         >
           <svg
             aria-hidden="true"
@@ -547,13 +597,46 @@ export function RetroRadio({
             strokeWidth="3"
             strokeLinecap="round"
             strokeLinejoin="round"
-            className="text-[var(--radio-body-2)]"
-          >
+            className="text-white"
+            >
             <path d="M2 18h1.4c1.3 0 2.5-.6 3.3-1.7l6.1-8.6c.8-1.1 2-1.7 3.3-1.7H22" />
             <path d="m18 2 4 4-4 4" />
             <path d="M2 6h1.9c1.5 0 2.9.9 3.6 2.2" />
             <path d="M22 18h-5.9c-1.3 0-2.6-.7-3.3-1.8l-.5-.8" />
             <path d="m18 14 4 4-4 4" />
+          </svg>
+        </button>
+
+        {/* 右缘上：睡眠定时按压侧键（随机键上方；按压循环切换档位，液晶屏顶部显示状态） */}
+        <button
+          type="button"
+          onClick={onPressSleepTimer}
+          aria-label={
+            sleepPendingActive
+              ? `睡眠定时已选 ${sleepPending} 分钟，5 秒后开始，继续按压切换`
+              : sleepActive
+                ? `睡眠定时剩余 ${sleepText}，按压重新选择`
+                : "按压设置睡眠定时，到时自动暂停"
+          }
+          className={`absolute -right-3 top-[calc(50%_-_76px)] z-20 flex h-12 w-4 origin-left -translate-y-1/2 items-center justify-center rounded-r-md bg-gradient-to-b from-[var(--radio-knob-1)] to-[var(--radio-knob-2)] shadow-md ring-1 ring-black/30 transition-[translate,scale,box-shadow] duration-150 after:absolute after:-inset-x-4 after:-inset-y-2 after:content-[''] active:scale-x-[0.7] active:shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent ${
+            sleepActive || sleepPendingActive
+              ? "shadow-[0_0_10px_rgba(45,212,191,0.55)]"
+              : "hover:brightness-105"
+          }`}
+        >
+          <svg
+            aria-hidden="true"
+            width="9"
+            height="9"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="3"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="text-white"
+          >
+            <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9z" />
           </svg>
         </button>
       </div>

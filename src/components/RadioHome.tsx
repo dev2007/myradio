@@ -11,7 +11,8 @@ interface RadioHomeProps {
 }
 
 export function RadioHome({ onBrowse }: RadioHomeProps) {
-  const { current, state, error, playStation, toggle } = usePlayer();
+  const { current, state, error, playStation, toggle, sleepRemaining, sleepPending, pressSleepTimer } =
+    usePlayer();
   const { favorites } = useFavorites();
   const { history } = useHistory();
   const [listTab, setListTab] = useState<"favorites" | "history">("favorites");
@@ -56,7 +57,7 @@ export function RadioHome({ onBrowse }: RadioHomeProps) {
           : null;
 
   return (
-    <div className="mx-auto flex h-full w-full max-w-2xl flex-col items-center justify-center gap-4 px-4">
+    <div className="mx-auto flex h-full w-full flex-col items-center justify-center gap-4 px-4">
       <div className="w-full shrink-0">
         <RetroRadio
           station={current}
@@ -69,6 +70,9 @@ export function RadioHome({ onBrowse }: RadioHomeProps) {
           onChannelSelect={playStation}
           onRandom={() => void playRandom()}
           randomLoading={randomLoading}
+          sleepRemaining={sleepRemaining}
+          sleepPending={sleepPending}
+          onPressSleepTimer={pressSleepTimer}
         />
       </div>
 
