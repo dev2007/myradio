@@ -143,6 +143,11 @@ export function recordHistory(station: Station) {
   persistHistory([station, ...rest].slice(0, MAX_HISTORY));
 }
 
+/** 模块级读取播放历史（供无 Provider 依赖的模块使用，如 MediaSession 处理器） */
+export function getHistory(): Station[] {
+  return getHistorySnapshot();
+}
+
 interface HistoryContextValue {
   history: Station[];
 }

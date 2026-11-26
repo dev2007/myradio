@@ -5,6 +5,7 @@ import type { Station } from "@/types/station";
 import { usePlayer } from "@/lib/player-context";
 import { RadioHome } from "./RadioHome";
 import { HomeBrowser } from "./HomeBrowser";
+import { NowPlayingBar } from "./NowPlayingBar";
 import { ThemeToggle } from "./ThemeToggle";
 
 const SWIPE_THRESHOLD = 60;
@@ -130,7 +131,7 @@ export function AppShell({ initialItems, initialError }: AppShellProps) {
   );
 
   return (
-    <div className="flex h-dvh flex-col overflow-hidden">
+    <div className="relative flex h-dvh flex-col overflow-hidden">
       <header className="safe-top flex items-center justify-between gap-3 border-b border-border px-4 py-2">
         <div className="flex items-center gap-2.5">
           <span
@@ -167,7 +168,7 @@ export function AppShell({ initialItems, initialError }: AppShellProps) {
             aria-label="全部电台"
             aria-hidden={page !== 1}
             inert={page !== 1}
-            className="no-scrollbar h-full w-1/2 overflow-y-auto px-4 pb-8 pt-4 sm:px-6"
+            className="no-scrollbar h-full w-1/2 overflow-y-auto px-4 pb-24 pt-4 sm:px-6"
           >
             <div className="mx-auto w-full max-w-6xl">
               <HomeBrowser initialItems={initialItems} initialError={initialError} />
@@ -176,6 +177,9 @@ export function AppShell({ initialItems, initialError }: AppShellProps) {
           </section>
         </div>
       </div>
+
+      {/* 正在播放栏：仅在浏览页且有播放记录时显示 */}
+      {page === 1 && <NowPlayingBar onGoHome={() => goToPage(0)} />}
     </div>
   );
 }

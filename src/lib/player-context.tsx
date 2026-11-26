@@ -10,7 +10,7 @@ import {
   useState,
 } from "react";
 import type { Station } from "@/types/station";
-import { recordHistory } from "@/lib/favorites-context";
+import { getHistory, recordHistory } from "@/lib/favorites-context";
 
 export type PlayerState = "idle" | "loading" | "playing" | "paused" | "error";
 
@@ -53,6 +53,8 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const [sleepRemaining, setSleepRemaining] = useState<number | null>(null);
   const [sleepPending, setSleepPending] = useState<number | null>(null);
   const sleepPendingRef = useRef<number | null>(null);
+  /** MediaSession 历史导航索引：当前播放的电台位于历史列表中的位置 */
+  const historyNavRef = useRef(0);
 
   // 单例 audio 元素：切换电台只换 src，不重挂载，避免播放中断
   useEffect(() => {
@@ -88,7 +90,56 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  // Media Session：锁屏/通知栏显示电台信息与控制按钮
+  const playStation = useCallback(
+    (station: Station, options?: { record?: boolean }) => {
+      const audio = audioRef.current;
+      if (!audio) return;
+      const record = options?.record !== false;
+      setCurrent(station);
+      setState("loading");
+      setError(null);
+      if (record) {
+        recordHistory(station);
+        // 正常播放总是回到历史最新一条，MediaSession 上/下一首导航索引归零
+        historyNavRef.current = 0;
+      }
+      audio.src = station.streamUrl;
+      // 通知 AppShell：从浏览页发起播放时自动滑回首页
+      window.dispatchEvent(new CustomEvent("radioo:play"));
+      audio.play().catch(() => {
+        setState("error");
+        setError("播放失败，该电台流可能已失效");
+      });
+    },
+    []
+  );
+
+  /** MediaSession 上一首/下一首：在播放历史中前后导航（导航播放不重写历史，
+   *  用 historyNavRef 记住当前位于历史中的位置，正常播放时归零到最新） */
+  const playFromHistory = useCallback(
+    (direction: "prev" | "next") => {
+      const history = getHistory();
+      if (history.length === 0 || !current) return;
+      const nav = historyNavRef.current;
+      const idx =
+        nav >= 0 && nav < history.length && history[nav]?.uuid === current.uuid
+          ? nav
+          : Math.max(history.findIndex((s) => s.uuid === current.uuid), 0);
+      const target =
+        direction === "prev"
+          ? history[Math.min(idx + 1, history.length - 1)]
+          : history[Math.max(idx - 1, 0)];
+      if (!target || target.uuid === current.uuid) return;
+      historyNavRef.current =
+        direction === "prev"
+          ? Math.min(idx + 1, history.length - 1)
+          : Math.max(idx - 1, 0);
+      playStation(target, { record: false });
+    },
+    [current, playStation]
+  );
+
+  // Media Session：锁屏/通知栏显示电台信息与控制按钮（含蓝牙耳机上一首/下一首）
   useEffect(() => {
     if (!current) return;
     const ms = navigator.mediaSession;
@@ -104,26 +155,12 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       });
       ms.setActionHandler("play", () => audioRef.current?.play());
       ms.setActionHandler("pause", () => audioRef.current?.pause());
+      ms.setActionHandler("previoustrack", () => playFromHistory("prev"));
+      ms.setActionHandler("nexttrack", () => playFromHistory("next"));
     } catch {
       // MediaMetadata 不支持时静默降级
     }
-  }, [current]);
-
-  const playStation = useCallback((station: Station) => {
-    const audio = audioRef.current;
-    if (!audio) return;
-    setCurrent(station);
-    setState("loading");
-    setError(null);
-    recordHistory(station);
-    audio.src = station.streamUrl;
-    // 通知 AppShell：从浏览页发起播放时自动滑回首页
-    window.dispatchEvent(new CustomEvent("radioo:play"));
-    audio.play().catch(() => {
-      setState("error");
-      setError("播放失败，该电台流可能已失效");
-    });
-  }, []);
+  }, [current, playFromHistory]);
 
   const toggle = useCallback(() => {
     const audio = audioRef.current;
