@@ -352,6 +352,30 @@ body {
   }
 }
 
+/* 紧凑模式（机身宽 <560px）控制排左侧迷你波形图：条高由内联样式给定，
+   播放时复用均衡器律动，暂停时保持低幅静置 */
+.compact-wave span {
+  width: 4px;
+  border-radius: 2px;
+  background: var(--color-accent);
+  transform-origin: bottom;
+  transform: scaleY(0.35);
+  opacity: 0.5;
+}
+
+.radio-playing .compact-wave span {
+  opacity: 1;
+  animation: machine-eq-bounce 0.6s ease-in-out infinite alternate;
+}
+
+.compact-wave span.wave-2 {
+  animation-delay: 0.15s;
+}
+
+.compact-wave span.wave-3 {
+  animation-delay: 0.3s;
+}
+
 .led {
   background: color-mix(in srgb, var(--color-danger) 25%, transparent);
   transition: background-color 0.3s, box-shadow 0.3s;
@@ -416,5 +440,12 @@ body {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
+  }
+
+  /* 减少动效下律动被禁，播放时波形条退化为矮静置态——
+     改为满幅静置，保证播放状态在波形图上仍可见 */
+  .radio-playing .compact-wave span {
+    transform: scaleY(1);
+    opacity: 1;
   }
 }
