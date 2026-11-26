@@ -249,18 +249,18 @@ export function RetroRadio({
 
   return (
     <div
-      className={`radio-machine relative mx-auto w-full max-w-[min(100%,calc((100dvh_-_232px)*1.7778),768px)] ${isPlaying ? "radio-playing" : ""}`}
+      className={`radio-machine relative mx-auto w-full max-w-[min(100%,calc((100dvh_-_288px)*1.7778),768px)] ${isPlaying ? "radio-playing" : ""}`}
     >
-      {/* 天线（右上，播放时摆动） */}
+      {/* 天线（左上，播放时摆动）：与顶部夹角小、细长，顶部向机身内侧倾斜避免超出页面 */}
       <div
         aria-hidden="true"
-        className="antenna absolute -top-20 right-8 z-0 h-28 w-1 origin-bottom-left -rotate-[30deg] rounded-full bg-gradient-to-t from-[var(--radio-body-2)] via-[var(--radio-knob-1)] to-[var(--radio-body-1)]"
+        className="antenna absolute -top-42 left-8 z-0 h-50 w-1 origin-bottom-left rotate-[45deg] rounded-full bg-gradient-to-t from-[var(--radio-body-2)] via-[var(--radio-knob-1)] to-[var(--radio-body-1)]"
       >
         <span className="absolute -top-1.5 -left-[3px] h-2.5 w-2.5 rounded-full bg-[var(--radio-knob-1)]" />
       </div>
 
       {/* 机身（红色） */}
-      <div className="relative mt-16 aspect-[16/9] w-full rounded-[1.75rem] border border-black/25 bg-gradient-to-b from-[var(--radio-body-1)] to-[var(--radio-body-2)] px-3 pb-[18px] pt-[18px] pr-14 shadow-2xl">
+      <div className="relative mt-30 aspect-[16/9] w-full rounded-[1.75rem] border border-black/25 bg-gradient-to-b from-[var(--radio-body-1)] to-[var(--radio-body-2)] px-3 pb-[18px] pt-[18px] pr-14 shadow-2xl">
         {/* 顶部/底部防滑条纹 */}
         <div
           aria-hidden="true"

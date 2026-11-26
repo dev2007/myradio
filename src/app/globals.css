@@ -216,10 +216,10 @@ body {
 @keyframes antenna-sway {
   0%,
   100% {
-    rotate: -30deg;
+    rotate: 45deg;
   }
   50% {
-    rotate: -36deg;
+    rotate: 51deg;
   }
 }
 

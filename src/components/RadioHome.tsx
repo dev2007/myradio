@@ -13,7 +13,7 @@ interface RadioHomeProps {
 export function RadioHome({ onBrowse }: RadioHomeProps) {
   const { current, state, error, playStation, toggle, sleepRemaining, sleepPending, pressSleepTimer } =
     usePlayer();
-  const { favorites } = useFavorites();
+  const { favorites, isFavorite } = useFavorites();
   const { history } = useHistory();
   const [listTab, setListTab] = useState<"favorites" | "history">("favorites");
   const [randomLoading, setRandomLoading] = useState(false);
@@ -36,12 +36,14 @@ export function RadioHome({ onBrowse }: RadioHomeProps) {
       if (candidates.length === 0) throw new Error();
       const pick = candidates[Math.floor(Math.random() * candidates.length)];
       playStation(pick);
+      // 随机选中的台不在当前展示的收藏列表中时，切到历史列表让液晶屏高亮新频道
+      if (listTab === "favorites" && !isFavorite(pick.uuid)) setListTab("history");
     } catch {
       setRandomError("没挑到电台，再试一次吧");
     } finally {
       setRandomLoading(false);
     }
-  }, [playStation, randomLoading, current]);
+  }, [playStation, randomLoading, current, listTab, isFavorite]);
 
   const isLoading = state === "loading";
   const isPlaying = state === "playing";
