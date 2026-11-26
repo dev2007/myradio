@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { Station } from "@/types/station";
 import { usePlayer } from "@/lib/player-context";
 import { useFavorites } from "@/lib/favorites-context";
@@ -49,6 +49,76 @@ const FREQ_MAX = 108;
 /** 刻度线：每 2MHz 一条，共 11 条 */
 const FREQ_TICKS = Array.from({ length: 11 }, (_, i) => FREQ_MIN + i * 2);
 
+/** 频谱条数量（喇叭均衡器 5 条 + 迷你波形图 5 条） */
+const VIZ_BARS = 5;
+/** 频谱分析取低频段前 16 个 bin（人耳敏感区，映射更明显） */
+const VIZ_BINS = 16;
+/** 频谱条静止幅度与最大幅度 */
+const VIZ_MIN = 0.15;
+const VIZ_MAX = 0.85;
+
+/**
+ * 播放中用 AnalyserNode 实时频谱驱动两组条形（喇叭均衡器 + 迷你波形图）。
+ * analyser 为 null（CORS 失败降级/图形库未运行）时关闭 viz-real，走 CSS 伪律动。
+ */
+function useSpectrum(
+  isPlaying: boolean,
+  getAnalyser: () => AnalyserNode | null
+): {
+  machineRef: React.RefObject<HTMLDivElement | null>;
+  setBar: (index: number) => (el: HTMLSpanElement | null) => void;
+} {
+  const machineRef = useRef<HTMLDivElement | null>(null);
+  const refs = useRef<(HTMLSpanElement | null)[]>([]);
+
+  useEffect(() => {
+    const barRefs = refs.current;
+    const root = machineRef.current;
+    const analyser = isPlaying ? getAnalyser() : null;
+    // 真实频谱可用与否通过根元素 class 同步到外部系统（CSS 据此启用/禁用伪律动）
+    root?.classList.toggle("viz-real", analyser !== null);
+    if (!analyser) return;
+
+    const data = new Uint8Array(analyser.frequencyBinCount);
+    const smooth = new Array<number>(VIZ_BARS * 2).fill(VIZ_MIN);
+    let raf = 0;
+    const tick = () => {
+      analyser.getByteFrequencyData(data);
+      for (let i = 0; i < VIZ_BARS * 2; i++) {
+        // 两组条共用同一频段映射（喇叭均衡器与波形图同步律动）
+        const band = i % VIZ_BARS;
+        const start = Math.floor((band / VIZ_BARS) * VIZ_BINS) + 1;
+        const end = Math.max(start + 2, Math.floor(((band + 1) / VIZ_BARS) * VIZ_BINS) + 1);
+        let sum = 0;
+        for (let j = start; j < end && j < data.length; j++) sum += data[j];
+        const v = sum / ((end - start) * 255);
+        smooth[i] = smooth[i] * 0.7 + v * 0.3;
+        const el = barRefs[i];
+        if (el) el.style.transform = `scaleY(${(VIZ_MIN + smooth[i] * VIZ_MAX).toFixed(3)})`;
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => {
+      cancelAnimationFrame(raf);
+      root?.classList.remove("viz-real");
+      // 停止时清掉内联样式，交还 CSS 基础形态
+      for (const el of barRefs) {
+        if (el) el.style.transform = "";
+      }
+    };
+  }, [isPlaying, getAnalyser]);
+
+  const setBar = useCallback(
+    (index: number) => (el: HTMLSpanElement | null) => {
+      refs.current[index] = el;
+    },
+    []
+  );
+
+  return { machineRef, setBar };
+}
+
 
 
 export function RetroRadio({
@@ -66,10 +136,11 @@ export function RetroRadio({
   sleepPending,
   onPressSleepTimer,
 }: RetroRadioProps) {
-  const { volume, setVolume } = usePlayer();
+  const { volume, setVolume, getAnalyser } = usePlayer();
   const { isFavorite, toggleFavorite } = useFavorites();
   const favActive = station ? isFavorite(station.uuid) : false;
   const volPercent = Math.round(volume * 100);
+  const { machineRef, setBar } = useSpectrum(isPlaying, getAnalyser);
   const knobRef = useRef<HTMLDivElement | null>(null);
   const tuningRef = useRef<HTMLDivElement | null>(null);
   const tuningDragRef = useRef<number | null>(null);
@@ -249,6 +320,7 @@ export function RetroRadio({
 
   return (
     <div
+      ref={machineRef}
       className={`radio-machine relative mx-auto w-full select-none pt-30 ${isPlaying ? "radio-playing" : ""}`}
     >
       {/* 天线（左上，播放时摆动）：与顶部夹角小、细长，顶部向机身内侧倾斜避免超出页面 */}
@@ -296,11 +368,11 @@ export function RetroRadio({
               aria-hidden="true"
               className="machine-eq absolute inset-x-0 bottom-0 flex h-2/5 items-end justify-center gap-2 pb-8"
             >
-              <span />
-              <span className="eq-2" />
-              <span className="eq-3" />
-              <span className="eq-2" />
-              <span />
+              <span ref={setBar(0)} />
+              <span ref={setBar(1)} className="eq-2" />
+              <span ref={setBar(2)} className="eq-3" />
+              <span ref={setBar(3)} className="eq-2" />
+              <span ref={setBar(4)} />
             </div>
             <span
               aria-hidden="true"
@@ -512,11 +584,11 @@ export function RetroRadio({
                 aria-hidden="true"
                 className="compact-wave hidden h-9 shrink-0 items-end gap-1 rounded-md bg-black/35 px-2 py-1.5 @max-[560px]:flex"
               >
-                <span style={{ height: "45%" }} />
-                <span className="wave-2" style={{ height: "75%" }} />
-                <span className="wave-3" style={{ height: "100%" }} />
-                <span className="wave-2" style={{ height: "60%" }} />
-                <span style={{ height: "85%" }} />
+                <span ref={setBar(5)} style={{ height: "45%" }} />
+                <span ref={setBar(6)} className="wave-2" style={{ height: "75%" }} />
+                <span ref={setBar(7)} className="wave-3" style={{ height: "100%" }} />
+                <span ref={setBar(8)} className="wave-2" style={{ height: "60%" }} />
+                <span ref={setBar(9)} style={{ height: "85%" }} />
               </div>
               <button
                 type="button"

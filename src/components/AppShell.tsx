@@ -7,6 +7,7 @@ import { RadioHome } from "./RadioHome";
 import { HomeBrowser } from "./HomeBrowser";
 import { NowPlayingBar } from "./NowPlayingBar";
 import { ThemeToggle } from "./ThemeToggle";
+import { ToastHost } from "./ToastHost";
 
 const SWIPE_THRESHOLD = 60;
 
@@ -222,6 +223,8 @@ export function AppShell({ initialItems, initialError }: AppShellProps) {
 
       {/* 正在播放栏：仅在浏览页且有播放记录时显示 */}
       {page === 1 && <NowPlayingBar onGoHome={() => goToPage(0)} />}
+
+      <ToastHost />
     </div>
   );
 }

@@ -148,8 +148,25 @@ export function getHistory(): Station[] {
   return getHistorySnapshot();
 }
 
+/** 模块级读取收藏列表 */
+export function getFavorites(): Station[] {
+  return getSnapshot();
+}
+
+/** 删除单条播放历史 */
+export function removeHistory(uuid: string): void {
+  persistHistory(getHistorySnapshot().filter((s) => s.uuid !== uuid));
+}
+
+/** 清空播放历史 */
+export function clearHistory(): void {
+  persistHistory([]);
+}
+
 interface HistoryContextValue {
   history: Station[];
+  removeHistory: (uuid: string) => void;
+  clearHistory: () => void;
 }
 
 const HistoryContext = createContext<HistoryContextValue | null>(null);
@@ -164,6 +181,9 @@ export function useHistory(): HistoryContextValue {
 
 export function HistoryProvider({ children }: { children: React.ReactNode }) {
   const history = useSyncExternalStore(subscribeHistory, getHistorySnapshot, getServerSnapshot);
-  const value = useMemo(() => ({ history }), [history]);
+  const value = useMemo(
+    () => ({ history, removeHistory, clearHistory }),
+    [history]
+  );
   return <HistoryContext.Provider value={value}>{children}</HistoryContext.Provider>;
 }

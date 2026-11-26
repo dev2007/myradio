@@ -10,12 +10,18 @@ import {
   useState,
 } from "react";
 import type { Station } from "@/types/station";
-import { getHistory, recordHistory } from "@/lib/favorites-context";
+import { getFavorites, getHistory, recordHistory } from "@/lib/favorites-context";
+import { toast } from "@/lib/toast";
+import { bindGraph, getAnalyser, markVizFailed, vizAllowed } from "@/lib/visualizer";
 
 export type PlayerState = "idle" | "loading" | "playing" | "paused" | "error";
 
 /** 睡眠定时可选时长（分钟），按压循环切换，末尾为「取消」 */
 const SLEEP_STEPS: number[] = [15, 30, 45, 60];
+
+/** 自动重试上限与间隔 */
+const MAX_RETRY = 2;
+const RETRY_DELAY = 1500;
 
 interface PlayerContextValue {
   current: Station | null;
@@ -33,6 +39,8 @@ interface PlayerContextValue {
   pressSleepTimer: () => void;
   /** 在播放历史中前后导航播放（MediaSession/键盘快捷键共用） */
   playFromHistory: (direction: "prev" | "next") => void;
+  /** 当前生效的 AnalyserNode；未走可视化元素或图形库未运行时为 null（调用方降级 CSS 律动） */
+  getAnalyser: () => AnalyserNode | null;
 }
 
 const PlayerContext = createContext<PlayerContextValue | null>(null);
@@ -46,8 +54,14 @@ export function usePlayer(): PlayerContextValue {
 }
 
 export function PlayerProvider({ children }: { children: React.ReactNode }) {
-  const audioRef = useRef<HTMLAudioElement | null>(null);
+  /** 普通音频元素：任何电台都能播（无 CORS 要求），但接不了频谱 */
+  const plainRef = useRef<HTMLAudioElement | null>(null);
+  /** 可视化音频元素：恒带 crossOrigin=anonymous，支持 CORS 的电台走它 */
+  const vizRef = useRef<HTMLAudioElement | null>(null);
+  /** 当前生效元素；事件监听只响应生效元素的回调，避免切换时旧元素事件串扰 */
+  const activeRef = useRef<"plain" | "viz">("plain");
   const [current, setCurrent] = useState<Station | null>(null);
+  const currentRef = useRef<Station | null>(null);
   const [state, setState] = useState<PlayerState>("idle");
   const [error, setError] = useState<string | null>(null);
   const [volume, setVolumeState] = useState(0.9);
@@ -57,46 +71,102 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const sleepPendingRef = useRef<number | null>(null);
   /** MediaSession 历史导航索引：当前播放的电台位于历史列表中的位置 */
   const historyNavRef = useRef(0);
+  /** 播放序号：换台时递增，过期元素的错误回调据此放弃重试 */
+  const seqRef = useRef(0);
+  /** 自动重试状态：跟随最近一次播放的序号 */
+  const retryRef = useRef({ seq: 0, count: 0, url: "" });
 
-  // 单例 audio 元素：切换电台只换 src，不重挂载，避免播放中断
+  const activeEl = useCallback(
+    () => (activeRef.current === "viz" ? vizRef.current : plainRef.current),
+    []
+  );
+
+  // 双音频元素单例：切换电台只换 src / 换元素，不重挂载，避免播放中断
   useEffect(() => {
-    if (!audioRef.current) {
-      const audio = new Audio();
-      audio.preload = "none";
-      audio.volume = 0.9;
-      audioRef.current = audio;
+    if (!plainRef.current) {
+      const plain = new Audio();
+      plain.preload = "none";
+      plain.volume = 0.9;
+      plainRef.current = plain;
     }
-    const audio = audioRef.current;
-    if (!audio) return;
+    if (!vizRef.current) {
+      const viz = new Audio();
+      viz.preload = "none";
+      viz.volume = 0.9;
+      vizRef.current = viz;
+    }
 
-    const onPlaying = () => {
+    const isForActive = (e: Event) => e.target === activeEl();
+
+    const onPlaying = (e: Event) => {
+      if (!isForActive(e)) return;
       setState("playing");
       setError(null);
+      retryRef.current.count = 0;
     };
-    const onWaiting = () => setState("loading");
-    const onPause = () => setState((prev) => (prev === "error" ? prev : "paused"));
-    const onError = () => {
-      setState("error");
-      setError("电台暂时不可用，请稍后再试或换一个电台");
+    const onWaiting = (e: Event) => {
+      if (isForActive(e)) setState("loading");
+    };
+    const onPause = (e: Event) => {
+      if (!isForActive(e)) return;
+      setState((prev) => (prev === "error" ? prev : "paused"));
+    };
+    const onError = (e: Event) => {
+      if (!isForActive(e)) return;
+      const info = retryRef.current;
+      if (info.seq !== seqRef.current || !info.url) return;
+
+      // 可视化元素加载失败（多为电台流不支持 CORS）：记入失败名单，换普通元素重播一次（静默，用户无需感知降级）
+      if (activeRef.current === "viz") {
+        markVizFailed(currentRef.current?.uuid ?? "");
+        const plain = plainRef.current;
+        if (!plain) return;
+        plain.removeAttribute("crossorigin");
+        activeRef.current = "plain";
+        plain.src = info.url;
+        void plain.play().catch(() => {});
+        return;
+      }
+
+      // 自动重试（最多 2 次，间隔 1.5s），仍失败则给出换台建议
+      if (info.count >= MAX_RETRY) {
+        setState("error");
+        setError("播放失败：该电台暂时连不上，可从播放历史或频道列表换个电台");
+        toast("自动重试失败，已停止播放");
+        return;
+      }
+      info.count += 1;
+      setState("loading");
+      toast(`连接中断，自动重试（${info.count}/${MAX_RETRY}）…`);
+      window.setTimeout(() => {
+        const el = activeEl();
+        if (!el || retryRef.current.seq !== seqRef.current) return;
+        el.src = info.url;
+        void el.play().catch(() => {});
+      }, RETRY_DELAY);
     };
 
-    audio.addEventListener("playing", onPlaying);
-    audio.addEventListener("waiting", onWaiting);
-    audio.addEventListener("pause", onPause);
-    audio.addEventListener("error", onError);
+    const elements = [plainRef.current, vizRef.current];
+    for (const el of elements) {
+      el.addEventListener("playing", onPlaying);
+      el.addEventListener("waiting", onWaiting);
+      el.addEventListener("pause", onPause);
+      el.addEventListener("error", onError);
+    }
     return () => {
-      audio.removeEventListener("playing", onPlaying);
-      audio.removeEventListener("waiting", onWaiting);
-      audio.removeEventListener("pause", onPause);
-      audio.removeEventListener("error", onError);
+      for (const el of elements) {
+        el.removeEventListener("playing", onPlaying);
+        el.removeEventListener("waiting", onWaiting);
+        el.removeEventListener("pause", onPause);
+        el.removeEventListener("error", onError);
+      }
     };
-  }, []);
+  }, [activeEl]);
 
   const playStation = useCallback(
     (station: Station, options?: { record?: boolean }) => {
-      const audio = audioRef.current;
-      if (!audio) return;
       const record = options?.record !== false;
+      currentRef.current = station;
       setCurrent(station);
       setState("loading");
       setError(null);
@@ -105,15 +175,32 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         // 正常播放总是回到历史最新一条，MediaSession 上/下一首导航索引归零
         historyNavRef.current = 0;
       }
-      audio.src = station.streamUrl;
+      seqRef.current += 1;
+      retryRef.current = { seq: seqRef.current, count: 0, url: station.streamUrl };
+
+      // 按 CORS 失败名单选择元素：支持 CORS 的电台走可视化元素
+      const useViz = vizAllowed(station.uuid) && typeof window.AudioContext === "function";
+      const el = (useViz ? vizRef.current : plainRef.current) ?? plainRef.current;
+      if (!el) return;
+      const other = el === vizRef.current ? plainRef.current : vizRef.current;
+      other?.pause();
+      activeRef.current = el === vizRef.current ? "viz" : "plain";
+      if (el === vizRef.current) {
+        el.crossOrigin = "anonymous";
+        bindGraph(el);
+      }
+      el.volume = volume;
+      el.src = station.streamUrl;
       // 通知 AppShell：从浏览页发起播放时自动滑回首页
       window.dispatchEvent(new CustomEvent("radioo:play"));
-      audio.play().catch(() => {
+      el.play().catch((err) => {
+        // 换台打断旧加载属正常竞态，不当作错误
+        if (err instanceof DOMException && err.name === "AbortError") return;
         setState("error");
         setError("播放失败，该电台流可能已失效");
       });
     },
-    []
+    [volume]
   );
 
   /** MediaSession 上一首/下一首：在播放历史中前后导航（导航播放不重写历史，
@@ -155,35 +242,40 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
           ? [{ src: current.favicon, sizes: "96x96", type: "image/png" }]
           : [],
       });
-      ms.setActionHandler("play", () => audioRef.current?.play());
-      ms.setActionHandler("pause", () => audioRef.current?.pause());
+      ms.setActionHandler("play", () => void activeEl()?.play().catch(() => {}));
+      ms.setActionHandler("pause", () => activeEl()?.pause());
       ms.setActionHandler("previoustrack", () => playFromHistory("prev"));
       ms.setActionHandler("nexttrack", () => playFromHistory("next"));
     } catch {
       // MediaMetadata 不支持时静默降级
     }
-  }, [current, playFromHistory]);
+  }, [current, playFromHistory, activeEl]);
 
   const toggle = useCallback(() => {
-    const audio = audioRef.current;
-    if (!audio || !current) return;
-    if (audio.paused) {
-      if (!audio.src) audio.src = current.streamUrl;
+    const el = activeEl();
+    if (!el || !current) return;
+    if (el.paused) {
+      if (!el.src) el.src = current.streamUrl;
+      // 继续播放时重置自动重试计数，让断流重试重新可用
+      retryRef.current = { seq: seqRef.current, count: 0, url: current.streamUrl };
       setState("loading");
       window.dispatchEvent(new CustomEvent("radioo:play"));
-      audio.play().catch(() => {
+      el.play().catch((err) => {
+        if (err instanceof DOMException && err.name === "AbortError") return;
         setState("error");
         setError("播放失败，该电台流可能已失效");
       });
     } else {
-      audio.pause();
+      el.pause();
     }
-  }, [current]);
+  }, [current, activeEl]);
 
   const setVolume = useCallback((value: number) => {
     const clamped = Math.min(Math.max(value, 0), 1);
     setVolumeState(clamped);
-    if (audioRef.current) audioRef.current.volume = clamped;
+    for (const el of [plainRef.current, vizRef.current]) {
+      if (el) el.volume = clamped;
+    }
     try {
       localStorage.setItem("radioo-volume", String(clamped));
     } catch {
@@ -201,7 +293,28 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         if (Number.isNaN(v)) return;
         const clamped = Math.min(Math.max(v, 0), 1);
         setVolumeState(clamped);
-        if (audioRef.current) audioRef.current.volume = clamped;
+        for (const el of [plainRef.current, vizRef.current]) {
+          if (el) el.volume = clamped;
+        }
+      } catch {
+        // 存储不可用时静默
+      }
+    });
+    return () => cancelAnimationFrame(id);
+  }, []);
+
+  // 首次进入：收藏列表有数据时预选第一个频道（暂停态、不自动播放，等用户按播放键）。
+  // 带 ?station= 分享参数进入时不预选，让分享链接的自动播放正常生效
+  useEffect(() => {
+    const id = requestAnimationFrame(() => {
+      try {
+        if (currentRef.current) return;
+        if (new URLSearchParams(window.location.search).has("station")) return;
+        const favorites = getFavorites();
+        if (favorites.length === 0) return;
+        currentRef.current = favorites[0];
+        setCurrent(favorites[0]);
+        setState("paused");
       } catch {
         // 存储不可用时静默
       }
@@ -251,13 +364,18 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       if (remain <= 0) {
         setSleepEndsAt(null);
         setSleepRemaining(null);
-        audioRef.current?.pause();
+        activeEl()?.pause();
       } else {
         setSleepRemaining(remain);
       }
     }, 1000);
     return () => clearInterval(id);
-  }, [sleepEndsAt]);
+  }, [sleepEndsAt, activeEl]);
+
+  const getAnalyserCb = useCallback(
+    () => (activeRef.current === "viz" ? getAnalyser() : null),
+    []
+  );
 
   const value = useMemo(
     () => ({
@@ -272,6 +390,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       sleepPending,
       pressSleepTimer,
       playFromHistory,
+      getAnalyser: getAnalyserCb,
     }),
     [
       current,
@@ -285,6 +404,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       sleepPending,
       pressSleepTimer,
       playFromHistory,
+      getAnalyserCb,
     ]
   );
 

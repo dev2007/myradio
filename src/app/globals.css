@@ -306,6 +306,13 @@ body {
   transform-origin: 10% 100%;
 }
 
+/* 真实频谱模式：AnalyserNode 接管条形高度（内联 transform），
+   禁用 CSS 伪律动动画避免覆盖实时数据 */
+.radio-playing.viz-real .machine-eq span,
+.radio-playing.viz-real .compact-wave span {
+  animation: none;
+}
+
 @keyframes antenna-sway {
   0%,
   100% {

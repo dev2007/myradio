@@ -4,6 +4,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { Station } from "@/types/station";
 import { usePlayer } from "@/lib/player-context";
 import { useFavorites } from "@/lib/favorites-context";
+import { shareStation } from "@/lib/share";
+import { toast } from "@/lib/toast";
 
 /** ISO 3166-1 alpha-2 转国旗 emoji，无效码回退电台图标 */
 function countryFlag(code: string): string {
@@ -57,20 +59,16 @@ export function StationCard({ station }: { station: Station }) {
   const [shareCopied, setShareCopied] = useState(false);
 
   /** 分享电台：优先系统分享面板，否则复制 ?station=uuid 链接（打开链接会自动播放） */
-  const shareStation = useCallback(async () => {
-    const url = `${window.location.origin}/?station=${station.uuid}`;
-    try {
-      if (navigator.share) {
-        await navigator.share({ title: station.name, url });
-        return;
-      }
-      await navigator.clipboard.writeText(url);
+  const share = useCallback(async () => {
+    const result = await shareStation(station);
+    if (result === "copied") {
       setShareCopied(true);
       setTimeout(() => setShareCopied(false), 2000);
-    } catch {
-      // 用户取消分享面板或剪贴板不可用：静默处理
+    } else if (result === "failed") {
+      toast("复制失败，请手动复制链接");
     }
-  }, [station.uuid, station.name]);
+    // shared：系统面板已处理；cancelled：用户取消，静默
+  }, [station]);
 
   return (
     <div
@@ -147,7 +145,7 @@ export function StationCard({ station }: { station: Station }) {
         <span className="flex items-center">
           <button
             type="button"
-            onClick={() => void shareStation()}
+            onClick={() => void share()}
             aria-label={shareCopied ? "链接已复制" : `分享 ${station.name}`}
             title={shareCopied ? "链接已复制" : "分享电台"}
             className="relative -ml-1 flex h-8 w-8 items-center justify-center rounded-full text-text-muted transition-colors hover:text-text after:absolute after:-inset-2 after:rounded-full after:content-[''] focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"

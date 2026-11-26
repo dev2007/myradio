@@ -5,6 +5,7 @@ import type { FilterOption, Station } from "@/types/station";
 import { useFavorites } from "@/lib/favorites-context";
 import { FilterBar } from "./FilterBar";
 import { StationGrid } from "./StationGrid";
+import { HistoryStrip } from "./HistoryStrip";
 
 async function fetchFilters(type: "countries" | "languages" | "tags"): Promise<FilterOption[]> {
   try {
@@ -134,6 +135,7 @@ export function HomeBrowser({ initialItems, initialError }: HomeBrowserProps) {
 
   return (
     <div className="flex flex-col gap-5">
+      <HistoryStrip />
       <FilterBar
         query={query}
         onQueryChange={setQuery}

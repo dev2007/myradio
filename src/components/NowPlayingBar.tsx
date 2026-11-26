@@ -4,6 +4,8 @@ import { useCallback, useState } from "react";
 import { createPortal } from "react-dom";
 import { usePlayer } from "@/lib/player-context";
 import { EqualizerBars } from "./StationCard";
+import { shareStation } from "@/lib/share";
+import { toast } from "@/lib/toast";
 
 interface NowPlayingBarProps {
   /** 点击条身回到收音机页 */
@@ -141,6 +143,36 @@ export function NowPlayingBar({ onGoHome }: NowPlayingBarProps) {
               <path d="M4 2.5v11a1 1 0 0 0 1.53.85l8.6-5.5a1 1 0 0 0 0-1.7l-8.6-5.5A1 1 0 0 0 4 2.5z" />
             </svg>
           )}
+        </button>
+
+        {/* 分享：优先系统分享面板，否则复制链接 */}
+        <button
+          type="button"
+          onClick={() =>
+            void shareStation(current).then((result) => {
+              if (result === "copied") toast("链接已复制，发给朋友即可收听");
+              else if (result === "failed") toast("复制失败，请手动复制链接");
+            })
+          }
+          aria-label={`分享 ${current.name}`}
+          title="分享电台"
+          className="relative hidden h-11 w-11 shrink-0 items-center justify-center rounded-full border border-border bg-surface text-text-muted transition-colors hover:border-primary/40 hover:text-text min-[480px]:flex focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+        >
+          <svg
+            aria-hidden="true"
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M12 15V4" />
+            <path d="M8 7.5L12 3.5l4 4" />
+            <path d="M5.5 11.5V19h13v-7.5" />
+          </svg>
         </button>
 
         {/* 画中画开关（不支持 Document PiP 的浏览器点击静默无效果） */}
