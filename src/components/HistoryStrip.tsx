@@ -6,30 +6,40 @@ import { usePlayer } from "@/lib/player-context";
 import { useHistory } from "@/lib/favorites-context";
 
 const MAX_CHIPS = 20;
+const PANEL_ID = "recent-history-panel";
 
-/** 浏览页顶部的最近播放条：点击播放、单条删除、一键清空 */
-export function HistoryStrip() {
+/** 筛选栏下方的最近播放面板：点击播放、单条删除、一键清空；open=false 时不渲染 */
+export function HistoryStrip({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { history, removeHistory, clearHistory } = useHistory();
   const { current, playStation } = usePlayer();
 
-  if (history.length === 0) return null;
+  if (!open || history.length === 0) return null;
 
   const chips: Station[] = history.slice(0, MAX_CHIPS);
 
   return (
-    <section aria-label="最近播放" className="flex flex-col gap-2">
+    <section id={PANEL_ID} aria-label="最近播放" className="flex flex-col gap-2">
       <div className="flex items-center justify-between">
         <h2 className="text-sm font-semibold text-text">最近播放</h2>
-        <button
-          type="button"
-          onClick={() => {
-            clearHistory();
-            toast("已清空播放历史");
-          }}
-          className="relative min-h-[36px] rounded-full px-3 text-xs font-medium text-text-muted transition-colors after:absolute after:-inset-1 after:rounded-full after:content-[''] hover:text-danger focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
-        >
-          清空
-        </button>
+        <div className="flex items-center">
+          <button
+            type="button"
+            onClick={() => {
+              clearHistory();
+              toast("已清空播放历史");
+            }}
+            className="relative min-h-[36px] rounded-full px-3 text-xs font-medium text-text-muted transition-colors after:absolute after:-inset-1 after:rounded-full after:content-[''] hover:text-danger focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+          >
+            清空
+          </button>
+          <button
+            type="button"
+            onClick={onClose}
+            className="relative min-h-[36px] rounded-full px-3 text-xs font-medium text-text-muted transition-colors after:absolute after:-inset-1 after:rounded-full after:content-[''] hover:text-text focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+          >
+            收起
+          </button>
+        </div>
       </div>
       <div className="no-scrollbar flex gap-2 overflow-x-auto pb-1">
         {chips.map((s) => {

@@ -2,10 +2,11 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { FilterOption, Station } from "@/types/station";
-import { useFavorites } from "@/lib/favorites-context";
+import { useFavorites, useHistory } from "@/lib/favorites-context";
 import { FilterBar } from "./FilterBar";
 import { StationGrid } from "./StationGrid";
 import { HistoryStrip } from "./HistoryStrip";
+import { BackupBar } from "./BackupBar";
 
 async function fetchFilters(type: "countries" | "languages" | "tags"): Promise<FilterOption[]> {
   try {
@@ -29,6 +30,7 @@ interface HomeBrowserProps {
 
 export function HomeBrowser({ initialItems, initialError }: HomeBrowserProps) {
   const { isFavorite, favorites } = useFavorites();
+  const { history } = useHistory();
   const [query, setQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [country, setCountry] = useState<string | null>(null);
@@ -36,6 +38,7 @@ export function HomeBrowser({ initialItems, initialError }: HomeBrowserProps) {
   const [tag, setTag] = useState<string | null>(null);
   const [order, setOrder] = useState<SortOrder>("clickcount");
   const [favOnly, setFavOnly] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const [items, setItems] = useState<Station[]>(initialItems);
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -135,24 +138,63 @@ export function HomeBrowser({ initialItems, initialError }: HomeBrowserProps) {
 
   return (
     <div className="flex flex-col gap-5">
-      <HistoryStrip />
-      <FilterBar
-        query={query}
-        onQueryChange={setQuery}
-        countries={countries}
-        languages={languages}
-        tags={tags}
-        country={country}
-        language={language}
-        tag={tag}
-        order={order}
-        onOrderChange={(v) => setOrder(v === "votes" ? "votes" : "clickcount")}
-        onCountryChange={setCountry}
-        onLanguageChange={setLanguage}
-        onTagChange={setTag}
-        onClearAll={clearAll}
-        hasActiveFilters={hasActiveFilters}
-      />
+      {/* 备份抽屉与搜索框同一行：搜索框占剩余宽度，图标在行尾不遮搜索框 */}
+      <div className="flex items-start gap-1">
+        <div className="min-w-0 flex-1">
+          <FilterBar
+            query={query}
+            onQueryChange={setQuery}
+            countries={countries}
+            languages={languages}
+            tags={tags}
+            country={country}
+            language={language}
+            tag={tag}
+            order={order}
+            onOrderChange={(v) => setOrder(v === "votes" ? "votes" : "clickcount")}
+            onCountryChange={setCountry}
+            onLanguageChange={setLanguage}
+            onTagChange={setTag}
+            onClearAll={clearAll}
+            hasActiveFilters={hasActiveFilters}
+          />
+        </div>
+        <div className="mt-1 flex shrink-0 items-center gap-1">
+          {history.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setHistoryOpen((v) => !v)}
+              aria-expanded={historyOpen}
+              aria-controls="recent-history-panel"
+              aria-label="最近播放历史"
+              title="最近播放历史"
+              className={`relative flex min-h-[44px] items-center gap-1.5 rounded-full border px-3 text-xs font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent ${
+                historyOpen
+                  ? "border-primary/60 bg-primary/15 text-primary-light"
+                  : "border-border bg-surface text-text-muted hover:border-primary/40 hover:text-text"
+              }`}
+            >
+              <svg
+                aria-hidden="true"
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <circle cx="12" cy="12" r="9" />
+                <path d="M12 7v5l3 2" />
+              </svg>
+              <span>{history.length}</span>
+            </button>
+          )}
+          <BackupBar />
+        </div>
+      </div>
+      <HistoryStrip open={historyOpen} onClose={() => setHistoryOpen(false)} />
       {loading && items.length > 0 && (
         <p role="status" className="text-xs text-text-muted">
           正在加载…

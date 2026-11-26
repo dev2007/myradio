@@ -163,6 +163,26 @@ export function clearHistory(): void {
   persistHistory([]);
 }
 
+/** 合并导入收藏：按 uuid 去重（不覆盖现有条目），新台排在最前，返回新增数量 */
+export function mergeFavorites(list: Station[]): number {
+  const current = getSnapshot();
+  const known = new Set(current.map((s) => s.uuid));
+  const added = list.filter((s) => !known.has(s.uuid));
+  if (added.length === 0) return 0;
+  persist([...added, ...current]);
+  return added.length;
+}
+
+/** 合并导入历史：按 uuid 去重（不覆盖现有条目），新台视为最近播放排在最前，返回新增数量 */
+export function mergeHistory(list: Station[]): number {
+  const current = getHistorySnapshot();
+  const known = new Set(current.map((s) => s.uuid));
+  const added = list.filter((s) => !known.has(s.uuid));
+  if (added.length === 0) return 0;
+  persistHistory([...added, ...current].slice(0, MAX_HISTORY));
+  return added.length;
+}
+
 interface HistoryContextValue {
   history: Station[];
   removeHistory: (uuid: string) => void;

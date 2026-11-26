@@ -238,7 +238,7 @@ export function FilterBar(props: FilterBarProps) {
           <button
             type="button"
             onClick={onClearAll}
-            className="ml-auto min-h-[44px] shrink-0 whitespace-nowrap rounded-full px-4 text-sm font-medium text-text-muted transition-colors hover:text-danger"
+            className="relative ml-auto min-h-[44px] shrink-0 whitespace-nowrap rounded-full px-4 text-sm font-medium text-text-muted transition-colors after:absolute after:-inset-1 after:rounded-full after:content-[''] hover:text-danger focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
           >
             清除筛选
           </button>
