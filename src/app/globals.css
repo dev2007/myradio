@@ -207,6 +207,87 @@ body {
   );
 }
 
+/* ---------- 旋钮/侧键随机身宽度等比缩放 ----------
+   .radio-machine 设为 inline-size 容器，旋钮/侧键尺寸用 cqw（机身宽度的百分比），
+   手机横屏机身变小时旋钮同步变小，不再遮挡侧键/溢出。
+   不支持 cqw 的旧浏览器回退为桌面固定尺寸（未分层 CSS 优先于 Tailwind 工具类） */
+.radio-machine {
+  container-type: inline-size;
+  /* 机身宽度按视口高度推算（16:9）：
+     长天线（默认）预留 头栏+信息区+天线竖直占用，预算 320px */
+  max-width: min(100%, max(calc((100dvh - 320px) * 1.7778), 240px), 768px);
+}
+
+@media (max-height: 640px) {
+  .radio-machine {
+    /* 矮视口（手机横屏/分屏）：短天线形态，预算降到 230px，机身更宽 */
+    max-width: min(100%, max(calc((100dvh - 230px) * 1.7778), 240px), 768px);
+  }
+}
+
+.machine-knob {
+  right: -20px;
+  width: 64px;
+  height: 64px;
+}
+
+.machine-knob-top {
+  top: 24px;
+}
+
+.machine-knob-bottom {
+  bottom: 24px;
+}
+
+.machine-key-random {
+  height: 56px;
+}
+
+.machine-key-sleep {
+  height: 48px;
+  top: calc(50% - 76px);
+}
+
+@supports (width: 1cqw) {
+  .machine-knob {
+    right: max(-2.6cqw, -9px);
+    width: max(8.33cqw, 24px);
+    height: max(8.33cqw, 24px);
+  }
+
+  .machine-knob-top {
+    top: max(3.1cqw, 10px);
+  }
+
+  .machine-knob-bottom {
+    bottom: max(3.1cqw, 10px);
+  }
+
+  .machine-key-random {
+    height: max(7.3cqw, 26px);
+  }
+
+  .machine-key-sleep {
+    height: max(6.25cqw, 20px);
+    top: calc(50% - max(9.9cqw, 34px));
+  }
+}
+
+/* 矮视口（手机横屏/分屏）：缩短天线并压低机身顶边距，
+   把竖向空间让给 16:9 机身，宽度公式（100dvh-170px 预算）与此配套 */
+@media (max-height: 640px) {
+  .radio-machine {
+    /* 短天线形态：顶边距 120px→60px（与宽度公式 230px 预算配套） */
+    padding-top: 60px;
+  }
+
+  .antenna {
+    /* 基座保持在机身顶下 32px：top = padding(60) + 32 - 高(120) = -28px */
+    top: -28px;
+    height: 120px;
+  }
+}
+
 /* 复古收音机播放态动画（reduced-motion 下由全局规则禁用） */
 .radio-playing .antenna {
   animation: antenna-sway 2.2s ease-in-out infinite;

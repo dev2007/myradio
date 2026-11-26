@@ -31,6 +31,8 @@ interface PlayerContextValue {
   sleepPending: number | null;
   /** 按压睡眠键：在时长档位与取消之间循环切换 */
   pressSleepTimer: () => void;
+  /** 在播放历史中前后导航播放（MediaSession/键盘快捷键共用） */
+  playFromHistory: (direction: "prev" | "next") => void;
 }
 
 const PlayerContext = createContext<PlayerContextValue | null>(null);
@@ -182,6 +184,29 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     const clamped = Math.min(Math.max(value, 0), 1);
     setVolumeState(clamped);
     if (audioRef.current) audioRef.current.volume = clamped;
+    try {
+      localStorage.setItem("radioo-volume", String(clamped));
+    } catch {
+      // 存储不可用时静默
+    }
+  }, []);
+
+  // 挂载后恢复持久化音量（rAF 异步恢复：规避 SSR 水合不一致，也不在 effect 内同步 setState）
+  useEffect(() => {
+    const id = requestAnimationFrame(() => {
+      try {
+        const raw = localStorage.getItem("radioo-volume");
+        if (raw === null) return;
+        const v = Number.parseFloat(raw);
+        if (Number.isNaN(v)) return;
+        const clamped = Math.min(Math.max(v, 0), 1);
+        setVolumeState(clamped);
+        if (audioRef.current) audioRef.current.volume = clamped;
+      } catch {
+        // 存储不可用时静默
+      }
+    });
+    return () => cancelAnimationFrame(id);
   }, []);
 
   /** 按压睡眠键：15→30→45→60→取消 循环；5 秒内不再按压即按当前档位开始倒计时 */
@@ -246,8 +271,21 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       sleepRemaining,
       sleepPending,
       pressSleepTimer,
+      playFromHistory,
     }),
-    [current, state, error, volume, playStation, toggle, setVolume, sleepRemaining, sleepPending, pressSleepTimer]
+    [
+      current,
+      state,
+      error,
+      volume,
+      playStation,
+      toggle,
+      setVolume,
+      sleepRemaining,
+      sleepPending,
+      pressSleepTimer,
+      playFromHistory,
+    ]
   );
 
   return <PlayerContext.Provider value={value}>{children}</PlayerContext.Provider>;

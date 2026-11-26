@@ -59,7 +59,7 @@ export function RadioHome({ onBrowse }: RadioHomeProps) {
           : null;
 
   return (
-    <div className="mx-auto flex h-full w-full flex-col items-center justify-center gap-4 px-4">
+    <div className="mx-auto flex h-full w-full flex-col items-center justify-center gap-4 px-6">
       <div className="w-full shrink-0">
         <RetroRadio
           station={current}

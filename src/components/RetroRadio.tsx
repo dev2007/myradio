@@ -156,18 +156,18 @@ export function RetroRadio({
     [setVolume, volPercent]
   );
 
-  /** 向 dir 方向转一档：切换到列表中相邻频道，到头返回 false（机械止点） */
+  /** 向 dir 方向转一档：直接切换到该频道并自动播放，到头返回 false（机械止点） */
   const turnDetents = useCallback(
     (dir: number): boolean => {
       if (channels.length === 0 || dir === 0) return false;
       const idx = channels.findIndex((s) => s.uuid === station?.uuid);
-      // 当前电台不在列表中时，任意方向的第一档先选中列表第一个频道
+      // 当前台不在列表中时，任意方向的第一档先选中列表第一个频道
       const at = idx === -1 ? 0 : idx + dir;
       if (at < 0 || at >= channels.length) return false;
       onChannelSelect(channels[at]);
       return true;
     },
-    [channels, onChannelSelect, station]
+    [channels, station, onChannelSelect]
   );
 
   /** 松手/取消时结束拖拽（视觉始终吸附在档位上，无需再吸附） */
@@ -197,7 +197,7 @@ export function RetroRadio({
       let delta = angle - tuningDragRef.current;
       delta = ((delta + 540) % 360) - 180;
       tuningDragRef.current = angle;
-      // 连续累积角度，换算目标档位；每跨过一档切一台
+      // 连续累积角度，换算目标档位；每跨过一档切换并播放一次频道
       tuningPosRef.current += delta;
       const target = Math.round(tuningPosRef.current / CHANNEL_STEP_DEG);
       const want = target - tuningDetentRef.current;
@@ -210,7 +210,7 @@ export function RetroRadio({
         idx === -1 ? 1 : dir > 0 ? channels.length - 1 - idx : idx
       );
       if (allowed > 0) {
-        // 一次事件内跨多档只触发一次选台，落到最终档位对应的频道
+        // 一次事件内跨多档只切换一次，落到最终档位对应的频道
         onChannelSelect(channels[idx === -1 ? 0 : idx + dir * allowed]);
         tuningDetentRef.current += dir * allowed;
       }
@@ -249,18 +249,18 @@ export function RetroRadio({
 
   return (
     <div
-      className={`radio-machine relative mx-auto w-full max-w-[min(100%,calc((100dvh_-_288px)*1.7778),768px)] ${isPlaying ? "radio-playing" : ""}`}
+      className={`radio-machine relative mx-auto w-full select-none pt-30 ${isPlaying ? "radio-playing" : ""}`}
     >
       {/* 天线（左上，播放时摆动）：与顶部夹角小、细长，顶部向机身内侧倾斜避免超出页面 */}
       <div
         aria-hidden="true"
-        className="antenna absolute -top-42 left-8 z-0 h-50 w-1 origin-bottom-left rotate-[45deg] rounded-full bg-gradient-to-t from-[var(--radio-body-2)] via-[var(--radio-knob-1)] to-[var(--radio-body-1)]"
+        className="antenna absolute -top-12 left-8 z-0 h-50 w-1 origin-bottom-left rotate-[45deg] rounded-full bg-gradient-to-t from-[var(--radio-body-2)] via-[var(--radio-knob-1)] to-[var(--radio-body-1)]"
       >
         <span className="absolute -top-1.5 -left-[3px] h-2.5 w-2.5 rounded-full bg-[var(--radio-knob-1)]" />
       </div>
 
       {/* 机身（红色） */}
-      <div className="relative mt-30 aspect-[16/9] w-full rounded-[1.75rem] border border-black/25 bg-gradient-to-b from-[var(--radio-body-1)] to-[var(--radio-body-2)] px-3 pb-[18px] pt-[18px] pr-14 shadow-2xl">
+      <div className="machine-body relative aspect-[16/9] w-full rounded-[1.75rem] border border-black/25 bg-gradient-to-b from-[var(--radio-body-1)] to-[var(--radio-body-2)] px-3 pb-[18px] pt-[18px] pr-14 shadow-2xl">
         {/* 顶部/底部防滑条纹 */}
         <div
           aria-hidden="true"
@@ -549,7 +549,7 @@ export function RetroRadio({
             dragRef.current = null;
           }}
           onKeyDown={onKnobKeyDown}
-          className="knob-ticks absolute -right-5 top-6 z-20 h-16 w-16 cursor-grab touch-none rounded-full p-[4px] shadow-lg ring-2 ring-black/30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent active:cursor-grabbing"
+          className="knob-ticks machine-knob machine-knob-top absolute z-20 cursor-grab touch-none rounded-full p-[4px] shadow-lg ring-2 ring-black/30 after:absolute after:-inset-2.5 after:rounded-full after:content-[''] focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent active:cursor-grabbing"
           style={{ transform: `rotate(${knobRotation}deg)` }}
         >
           <span className="relative block h-full w-full rounded-full bg-gradient-to-b from-[var(--radio-knob-1)] to-[var(--radio-knob-2)]">
@@ -572,7 +572,7 @@ export function RetroRadio({
           onPointerUp={endTuningDrag}
           onPointerCancel={endTuningDrag}
           onKeyDown={onTuningKeyDown}
-          className="knob-ticks absolute -right-5 bottom-6 z-20 h-16 w-16 cursor-grab touch-none rounded-full p-[4px] shadow-lg ring-2 ring-black/30 transition-transform duration-150 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent active:cursor-grabbing"
+          className="knob-ticks machine-knob machine-knob-bottom absolute z-20 cursor-grab touch-none rounded-full p-[4px] shadow-lg ring-2 ring-black/30 transition-transform duration-150 after:absolute after:-inset-2.5 after:rounded-full after:content-[''] focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent active:cursor-grabbing"
           style={{ transform: `rotate(${tuningAngle}deg)` }}
         >
           <span className="block h-full w-full rounded-full bg-gradient-to-b from-[var(--radio-knob-1)] to-[var(--radio-knob-2)]" />
@@ -585,7 +585,7 @@ export function RetroRadio({
           disabled={randomLoading}
           aria-busy={randomLoading}
           aria-label="随机播放一个频道"
-          className="absolute -right-3 top-1/2 z-20 flex h-14 w-4 origin-left -translate-y-1/2 items-center justify-center rounded-r-md bg-gradient-to-b from-[var(--radio-knob-1)] to-[var(--radio-knob-2)] shadow-md ring-1 ring-black/30 transition-[translate,scale,box-shadow] duration-150 hover:brightness-105 active:scale-x-[0.7] active:shadow-sm disabled:opacity-60 after:absolute after:-inset-x-4 after:-inset-y-2 after:content-[''] focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+          className="machine-key-random absolute -right-3 top-1/2 z-20 flex w-4 origin-left -translate-y-1/2 items-center justify-center rounded-r-md bg-gradient-to-b from-[var(--radio-knob-1)] to-[var(--radio-knob-2)] shadow-md ring-1 ring-black/30 transition-[translate,scale,box-shadow] duration-150 hover:brightness-105 active:scale-x-[0.7] active:shadow-sm disabled:opacity-60 after:absolute after:-inset-x-4 after:-inset-y-2 after:content-[''] focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
         >
           <svg
             aria-hidden="true"
@@ -618,7 +618,7 @@ export function RetroRadio({
                 ? `睡眠定时剩余 ${sleepText}，按压重新选择`
                 : "按压设置睡眠定时，到时自动暂停"
           }
-          className={`absolute -right-3 top-[calc(50%_-_76px)] z-20 flex h-12 w-4 origin-left -translate-y-1/2 items-center justify-center rounded-r-md bg-gradient-to-b from-[var(--radio-knob-1)] to-[var(--radio-knob-2)] shadow-md ring-1 ring-black/30 transition-[translate,scale,box-shadow] duration-150 after:absolute after:-inset-x-4 after:-inset-y-2 after:content-[''] active:scale-x-[0.7] active:shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent ${
+          className={`machine-key-sleep absolute -right-3 z-20 flex w-4 origin-left -translate-y-1/2 items-center justify-center rounded-r-md bg-gradient-to-b from-[var(--radio-knob-1)] to-[var(--radio-knob-2)] shadow-md ring-1 ring-black/30 transition-[translate,scale,box-shadow] duration-150 after:absolute after:-inset-x-4 after:-inset-y-2 after:content-[''] active:scale-x-[0.7] active:shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent ${
             sleepActive || sleepPendingActive
               ? "shadow-[0_0_10px_rgba(45,212,191,0.55)]"
               : "hover:brightness-105"
