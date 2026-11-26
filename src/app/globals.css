@@ -100,6 +100,8 @@
 html {
   /* 消除移动端点按延迟歧义 */
   touch-action: manipulation;
+  /* 交互元素均有自定义 hover/active 态，关闭系统点按高亮（刻意设置） */
+  -webkit-tap-highlight-color: transparent;
   color-scheme: light;
 }
 
@@ -270,6 +272,16 @@ body {
   .machine-key-sleep {
     height: max(6.25cqw, 20px);
     top: calc(50% - max(9.9cqw, 34px));
+  }
+}
+
+/* 小机身（紧凑模式）放大旋钮：外伸减少、向机身内多侵入，保证可操作性；
+   旋钮左缘（右缘 -5cqw-宽度）与正面按钮列/收藏历史 tab 右缘（右列 pr-7）之间保留约 10px 间隙 */
+@container (max-width: 559px) {
+  .machine-knob {
+    width: max(14cqw, 44px);
+    height: max(14cqw, 44px);
+    right: max(-5cqw, -18px);
   }
 }
 

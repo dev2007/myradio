@@ -449,7 +449,7 @@ export function RetroRadio({
               </div>
 
               {/* 紧凑模式：睡眠/随机正面按钮（竖排列靠左，避开右缘旋钮区） */}
-              <div className="hidden w-14 shrink-0 flex-col justify-center gap-2 @max-[560px]:flex">
+              <div className="hidden w-10 shrink-0 flex-col justify-center gap-2 @max-[560px]:flex">
                 <button
                   type="button"
                   onClick={onPressSleepTimer}
